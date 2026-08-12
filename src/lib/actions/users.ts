@@ -6,11 +6,7 @@ import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { db, users } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
-import { inviteMail, sendMail } from '@/lib/mail';
-
-const baseUrl = () =>
-  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+import { appUrl, inviteMail, sendMail } from '@/lib/mail';
 
 export async function inviteUser(input: { name: string; email: string; role: 'ADMIN' | 'USER' }) {
   await requireAdmin();
@@ -29,7 +25,7 @@ export async function inviteUser(input: { name: string; email: string; role: 'AD
     inviteToken: token, inviteExpiresAt: expires,
   });
 
-  const link = `${baseUrl()}/invite/${token}`;
+  const link = `${appUrl()}/invite/${token}`;
   const sent = await sendMail(email, 'Dein Zugang zum Raumplaner', inviteMail(name, link));
   revalidatePath('/', 'layout');
   return { ok: true as const, sent, link };
@@ -42,7 +38,7 @@ export async function resendInvite(id: number) {
   const [u] = await db.update(users)
     .set({ inviteToken: token, inviteExpiresAt: expires, status: 'INVITED' })
     .where(eq(users.id, id)).returning();
-  const link = `${baseUrl()}/invite/${token}`;
+  const link = `${appUrl()}/invite/${token}`;
   const sent = await sendMail(u.email, 'Dein Zugang zum Raumplaner', inviteMail(u.name, link));
   revalidatePath('/', 'layout');
   return { ok: true as const, sent, link };

@@ -15,6 +15,11 @@ Termine per Klick & Ziehen direkt im Stundenraster anlegen (15-Minuten-Raster).
 **Rollen** – Admins tragen Termine direkt ein, geben Anfragen frei, verwalten Nutzer und Räume.
 Nutzer stellen Anfragen. Keine Selbstregistrierung: Admins laden per E-Mail ein.
 
+**Benachrichtigungen** – bei einer neuen Anfrage bekommen alle aktiven Admins eine E-Mail
+(einzeln verschickt, damit die Adressen nicht gegenseitig sichtbar werden) mit Raum, Zeitraum,
+Anmerkung und einem Hinweis, falls sich die Anfrage mit einem bestätigten Termin überschneidet.
+Der Anfragende wird per Mail über Zusage oder Absage informiert.
+
 **Mehrtägige Termine** – zwei Arten:
 *durchgehend* (Raum ist auch nachts belegt, z. B. Aufbau oder Übernachtung) und
 *täglich wiederkehrend* (gleiches Zeitfenster an mehreren Tagen, z. B. ein Ferienworkshop).
@@ -149,6 +154,12 @@ materialisieren. Bei gleichzeitigen Eintragungen im selben Raum ist damit theore
 Doppelbuchung möglich – für ein Haus mit einer Handvoll Admins ist das vertretbar. Wer das
 härter braucht, materialisiert `DAILY`-Termine in eine `booking_days`-Tabelle und setzt dort
 den Exclusion-Constraint.
+
+### Konfliktinfos verlassen den Server nicht
+
+`findConflicts` läuft auch bei Anfragen von Nutzern – das Ergebnis geht aber nur in die
+Admin-Mail, nicht an den Anfragenden zurück. Sonst könnte man über wiederholte Anfragen
+herausfinden, wer wann welchen Raum belegt hat.
 
 ### Löschen ist ein Soft Delete
 

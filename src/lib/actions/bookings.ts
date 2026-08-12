@@ -6,7 +6,7 @@ import { db, bookings, rooms, users } from '@/lib/db';
 import { requireAdmin, requireUser } from '@/lib/auth';
 import { overlaps, type Ev, type SpanMode } from '@/lib/calendar';
 import { rangeText } from '@/lib/calendar';
-import { decisionMail, sendMail } from '@/lib/mail';
+import { decisionMail, requestMail, sendMail } from '@/lib/mail';
 
 export interface BookingInput {
   id?: number;
@@ -78,7 +78,7 @@ export async function saveBooking(input: BookingInput) {
     updatedAt: new Date(),
   };
 
-  const conflicts = admin ? await findConflicts({ ...input, spanMode }) : [];
+  const conflicts = await findConflicts({ ...input, spanMode });
 
   if (input.id) {
     await requireAdmin();
@@ -91,9 +91,34 @@ export async function saveBooking(input: BookingInput) {
       decidedById: admin ? me.id : null,
       decidedAt: admin ? new Date() : null,
     });
+    if (!admin) await notifyAdmins({ ...input, spanMode }, me.name, conflicts);
   }
   revalidatePath('/', 'layout');
-  return { ok: true as const, conflicts, pending: !admin };
+  return { ok: true as const, conflicts: admin ? conflicts : [], pending: !admin };
+}
+
+/** Neue Anfrage: alle aktiven Admins per E-Mail informieren – einzeln, damit
+ *  die Adressen der Admins nicht gegenseitig sichtbar werden. */
+async function notifyAdmins(
+  input: BookingInput, requester: string, conflicts: { title: string; when: string }[],
+) {
+  try {
+    const [room] = await db.select().from(rooms).where(eq(rooms.id, input.roomId)).limit(1);
+    const admins = await db.select({ email: users.email }).from(users)
+      .where(and(eq(users.role, 'ADMIN'), eq(users.status, 'ACTIVE')));
+    if (!admins.length) return;
+
+    const when = rangeText(asEv(input));
+    const html = requestMail(
+      requester, input.title.trim(), room?.name ?? '–', when,
+      input.attendees || 0, input.note?.trim() || null, conflicts,
+    );
+    await Promise.all(admins.map((a) =>
+      sendMail(a.email, `Neue Terminanfrage: ${input.title.trim()}`, html)));
+  } catch (err) {
+    // Eine fehlgeschlagene Benachrichtigung darf die Anfrage nicht scheitern lassen
+    console.error('Admin-Benachrichtigung fehlgeschlagen:', err);
+  }
 }
 
 export async function decideBooking(id: number, accept: boolean, note?: string) {
