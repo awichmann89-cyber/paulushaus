@@ -74,20 +74,37 @@ In Vercel unter **Settings → Environment Variables** (für Production *und* Pr
 > Ohne `RESEND_API_KEY` läuft die App weiter – dann zeigt die Oberfläche den Einladungslink
 > zum Kopieren an, statt eine Mail zu verschicken. Praktisch für den ersten Test.
 
-### 5. Datenbankschema einspielen
+### 5. Deployen – Datenbank richtet sich selbst ein
 
-Einmalig vom eigenen Rechner aus, mit derselben `DATABASE_URL`:
+Der Build-Befehl ist `npm run db:deploy && next build`. Vor jedem Build spielt Vercel
+also die Migrationen aus `drizzle/` ein und legt beim allerersten Mal den Admin-Account an.
+Ein manueller Schritt ist nicht nötig – einfach deployen.
 
-```bash
-npm install
-cp .env.example .env      # DATABASE_URL und die SEED_ADMIN_*-Werte eintragen
-npm run db:migrate        # legt die Tabellen an
-npm run seed              # legt den ersten Admin-Account an
-```
+Was `db:deploy` tut (`scripts/prepare-db.ts`):
 
-`npm run seed` liest `SEED_ADMIN_EMAIL`, `SEED_ADMIN_NAME` und `SEED_ADMIN_PASSWORD` aus der `.env`.
-Das Passwort braucht mindestens 10 Zeichen. Der Befehl ist wiederholbar – ein bestehender
-Account mit dieser E-Mail wird aktualisiert, nicht doppelt angelegt.
+1. Nimmt eine Session-weite Advisory-Lock, damit zwei gleichzeitige Builds nicht dieselbe
+   Migration nebeneinander fahren.
+2. Spielt alle noch nicht angewandten Migrationen ein. Bereits angewandte werden übersprungen –
+   Drizzle merkt sich das in der Tabelle `drizzle.__drizzle_migrations`.
+3. Legt einen Admin an, **wenn es noch gar keinen gibt** und `SEED_ADMIN_EMAIL` +
+   `SEED_ADMIN_PASSWORD` gesetzt sind. Existiert bereits ein Admin, passiert nichts.
+   Das Passwort wird also nicht bei jedem Deploy zurückgesetzt.
+
+Fehlt `DATABASE_URL`, wird der Schritt mit einer Warnung übersprungen und der Build läuft
+trotzdem durch. Ein echter Migrationsfehler bricht den Build dagegen ab – gewollt, sonst
+ginge eine App live, deren Schema nicht zum Code passt.
+
+**Zusätzliche Variablen für diesen Schritt** (alle optional):
+
+| Variable | Zweck |
+|---|---|
+| `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME` | erster Admin-Account, mind. 10 Zeichen Passwort. Nach dem ersten erfolgreichen Deploy kannst du sie wieder entfernen |
+| `DIRECT_DATABASE_URL` | ungepoolte Verbindung nur für Migrationen. Bei Neon empfohlen: DDL über den Pooler kann hängen bleiben. Ohne diese Variable wird `DATABASE_URL` benutzt |
+| `SKIP_DB_MIGRATE=1` | Migration in dieser Umgebung überspringen – sinnvoll für Preview-Deployments, die auf dieselbe Datenbank zeigen |
+
+> **Preview-Deployments:** zeigen sie auf dieselbe `DATABASE_URL` wie Production, wandert jede
+> Migration aus einem Branch sofort in die Produktivdatenbank. Entweder eine eigene
+> Datenbank für Preview hinterlegen oder dort `SKIP_DB_MIGRATE=1` setzen.
 
 ### 6. Erste Schritte in der App
 
@@ -104,8 +121,7 @@ Account mit dieser E-Mail wird aktualisiert, nicht doppelt angelegt.
 ```bash
 npm install
 cp .env.example .env       # DATABASE_URL auf eine lokale oder Neon-Datenbank zeigen lassen
-npm run db:migrate
-npm run seed
+npm run db:migrate         # Tabellen anlegen und ggf. ersten Admin bootstrappen
 npm run dev                # http://localhost:3000
 ```
 
@@ -115,6 +131,12 @@ Nach Änderungen am Schema (`src/lib/db/schema.ts`):
 npm run db:generate        # erzeugt eine neue Migration in drizzle/
 npm run db:migrate         # spielt sie ein
 ```
+
+Die neue Migration **muss mitcommittet werden** – der Vercel-Build spielt genau die Dateien
+aus `drizzle/` ein, nicht das Schema-File.
+
+`npm run seed` ist davon getrennt: es setzt das Passwort eines Admin-Accounts hart neu
+(oder legt ihn an) und ist der Weg, wenn man sich ausgesperrt hat.
 
 ---
 
@@ -136,7 +158,7 @@ src/
     calendar.ts       Termin-Logik: Tagesausschnitte, Überschneidungen, Spaltenaufteilung
     dates.ts          Datums- und Zeit-Helfer
 drizzle/              generierte Migrationen
-scripts/              migrate.ts, seed.ts
+scripts/              prepare-db.ts (Migration + Admin-Bootstrap), seed.ts (Admin-Passwort setzen)
 ```
 
 ### Zwei Entscheidungen, die beim Weiterbauen wichtig sind

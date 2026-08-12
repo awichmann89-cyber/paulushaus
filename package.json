@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run db:deploy && next build",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",
+    "db:deploy": "tsx scripts/prepare-db.ts",
+    "db:migrate": "tsx scripts/prepare-db.ts",
     "db:push": "drizzle-kit push",
-    "db:migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
