@@ -223,6 +223,7 @@ button{cursor:pointer;border:none;background:none}
 .dayhead.we .dw,.dayhead.we .dn{color:var(--text-3)}
 .dayhead.we.today .dn{color:#fff}
 
+.cal-swipe{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;touch-action:pan-y;will-change:transform}
 .cal-scroll{flex:1;overflow:auto;position:relative}
 .cal-grid{display:grid;position:relative;min-height:100%}
 .times{border-right:1px solid var(--hairline);position:relative}
@@ -599,11 +600,15 @@ a{color:inherit;text-decoration:none}
   .sidebar-scrim.on{background:rgba(0,0,0,.32);pointer-events:auto}
   .content{width:100%}
 
-  /* Topbar: wird zweizeilig statt seitlich abgeschnitten – Datum/Navigation
-     oben, Tag/Woche/Monat/Räume als eigene volle Zeile darunter */
+  /* Topbar: feste drei Zeilen statt variabel umbrechend (sonst hüpft das
+     Layout je nach Länge des Datumstexts, z. B. "Freitag" vs. "Samstag") –
+     Zeile 1: Heute/Pfeile + Avatar, Zeile 2: Datum, Zeile 3: Ansicht-Umschalter */
   .topbar{height:auto;min-height:52px;padding:8px 10px;gap:6px 8px}
-  .tb-left{flex-wrap:wrap;row-gap:6px;flex:1 1 auto;min-width:0}
-  .tb-title{font-size:14.5px;margin-left:2px}
+  .tb-left{flex-wrap:wrap;row-gap:4px;flex:1 1 auto;min-width:0}
+  .tb-title{
+    flex:0 0 100%;order:3;margin-left:0;font-size:14.5px;
+    text-align:left;white-space:normal;
+  }
   .tb-title span{display:none}
   .today-btn{padding:6px 9px;font-size:12.5px}
   .segmented{flex:0 0 100%;margin-left:0 !important;order:5}

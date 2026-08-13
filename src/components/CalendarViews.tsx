@@ -31,6 +31,7 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
   const start = days === 7 ? startOfWeek(p.cursor) : new Date(p.cursor);
   const cols = `var(--gutter) repeat(${days},minmax(var(--daycol-min,0px),1fr))`;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const swipeRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ date: string; top: number; a: number; b: number; moved: boolean } | null>(null);
 
   useEffect(() => {
@@ -68,27 +69,89 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
   const now = useNow();
   const nowMin = now ? now.getHours() * 60 + now.getMinutes() : -1;
 
-  /* Wischgeste zum Blättern (Handy) – nur auslösen, wenn die Bewegung klar
-     waagerecht, weit und schnell genug war, damit senkrechtes Scrollen durch
-     die Stunden und normales Antippen von Terminen unangetastet bleiben. */
-  const touchRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  /* Wischgeste zum Blättern (Handy): Inhalt folgt dem Finger live, bei
+     genügend Schwung/Weite wird der Tag-/Wochenwechsel ausgelöst und der
+     neue Inhalt schiebt von der jeweils anderen Seite nach – wie in
+     nativen Kalender-Apps. Senkrechtes Scrollen und normales Antippen von
+     Terminen bleiben unangetastet (Geste wird erst nach eindeutig
+     waagerechter Bewegung als Wisch gewertet). */
+  const [tx, setTx] = useState(0);
+  const [swipeAnim, setSwipeAnim] = useState(false);
+  const touchRef = useRef<{ x: number; y: number; t: number; dragging: boolean } | null>(null);
+  const pendingDir = useRef<-1 | 1 | null>(null);
+  const curKey = iso(p.cursor);
+
+  useEffect(() => {
+    if (pendingDir.current !== null) {
+      const w = swipeRef.current?.clientWidth || 320;
+      const dir = pendingDir.current;
+      pendingDir.current = null;
+      setSwipeAnim(false);
+      setTx(dir === 1 ? w : -w);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        setSwipeAnim(true);
+        setTx(0);
+      }));
+    } else {
+      setSwipeAnim(false);
+      setTx(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curKey]);
+
   const onTouchStart = (e: React.TouchEvent) => {
+    if (!p.onSwipe) return;
     const t = e.touches[0];
-    touchRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+    touchRef.current = { x: t.clientX, y: t.clientY, t: Date.now(), dragging: false };
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    const s = touchRef.current;
+    if (!s) return;
+    const t = e.touches[0];
+    const dx = t.clientX - s.x, dy = t.clientY - s.y;
+    if (!s.dragging) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.2) { touchRef.current = null; return; }
+      s.dragging = true;
+    }
+    const w = swipeRef.current?.clientWidth || 320;
+    const lin = Math.min(Math.abs(dx), w * 0.6);
+    const over = Math.max(0, Math.abs(dx) - w * 0.6) * 0.32; // Bremse, wenn sehr weit gezogen
+    const mag = lin + over;
+    setSwipeAnim(false);
+    setTx(dx < 0 ? -mag : mag);
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     const s = touchRef.current;
     touchRef.current = null;
-    if (!s || !p.onSwipe) return;
+    if (!s || !s.dragging || !p.onSwipe) { setSwipeAnim(true); setTx(0); return; }
     const t = e.changedTouches[0];
-    const dx = t.clientX - s.x, dy = t.clientY - s.y, dt = Date.now() - s.t;
-    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4 && dt < 700) {
-      p.onSwipe(dx < 0 ? 1 : -1);
+    const dx = t.clientX - s.x, dt = Date.now() - s.t;
+    const w = swipeRef.current?.clientWidth || 320;
+    const commit = Math.abs(dx) > Math.min(90, w * 0.22) || (Math.abs(dx) > 36 && dt < 220);
+    setSwipeAnim(true);
+    if (commit) {
+      const dir: -1 | 1 = dx < 0 ? 1 : -1;
+      setTx(dir === 1 ? -w : w);
+      pendingDir.current = dir;
+      p.onSwipe(dir);
+    } else {
+      setTx(0);
     }
   };
 
   return (
-    <>
+    <div
+      className="cal-swipe"
+      ref={swipeRef}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      style={{
+        transform: tx ? `translateX(${tx}px)` : undefined,
+        transition: swipeAnim ? 'transform .24s cubic-bezier(.2,.85,.3,1)' : 'none',
+      }}
+    >
       <div className="cal-head" style={{ gridTemplateColumns: cols }}>
         <div className="corner" />
         {Array.from({ length: days }, (_, i) => {
@@ -102,7 +165,7 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
         })}
       </div>
 
-      <div className="cal-scroll" ref={scrollRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div className="cal-scroll" ref={scrollRef}>
         <div className="cal-grid" style={{ gridTemplateColumns: cols, height: (HOUR_END - HOUR_START) * ROW }}>
           <div className="times">
             {Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => {
@@ -188,7 +251,7 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
           })}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
