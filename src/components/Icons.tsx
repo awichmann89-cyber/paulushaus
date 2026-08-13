@@ -37,3 +37,5 @@ export const IcoExpand = (p: { s?: number }) => (
   <S s={15} {...p}><path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3" /></S>);
 export const IcoArrow = (p: { s?: number }) => (
   <S s={13} strokeWidth={2} {...p}><path d="M7 17L17 7M9 7h8v8" /></S>);
+export const IcoMenu = (p: { s?: number }) => (
+  <S {...p}><path d="M4 7h16M4 12h16M4 17h16" /></S>);

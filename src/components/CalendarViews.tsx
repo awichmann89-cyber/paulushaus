@@ -27,7 +27,7 @@ const roomOf = (rooms: RoomView[], id: number) => rooms.find((r) => r.id === id)
 /* ================= Wochen- und Tagesansicht ================= */
 export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
   const start = days === 7 ? startOfWeek(p.cursor) : new Date(p.cursor);
-  const cols = `var(--gutter) repeat(${days},1fr)`;
+  const cols = `var(--gutter) repeat(${days},minmax(var(--daycol-min,0px),1fr))`;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ date: string; top: number; a: number; b: number; moved: boolean } | null>(null);
 
@@ -67,7 +67,7 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
   const nowMin = now ? now.getHours() * 60 + now.getMinutes() : -1;
 
   return (
-    <>
+    <div className="cal-scroll" ref={scrollRef}>
       <div className="cal-head" style={{ gridTemplateColumns: cols }}>
         <div className="corner" />
         {Array.from({ length: days }, (_, i) => {
@@ -81,8 +81,7 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
         })}
       </div>
 
-      <div className="cal-scroll" ref={scrollRef}>
-        <div className="cal-grid" style={{ gridTemplateColumns: cols, height: (HOUR_END - HOUR_START) * ROW }}>
+      <div className="cal-grid" style={{ gridTemplateColumns: cols, height: (HOUR_END - HOUR_START) * ROW }}>
           <div className="times">
             {Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => {
               const h = HOUR_START + i;
@@ -167,11 +166,11 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
           })}
         </div>
       </div>
-    </>
   );
 }
 
 /* ================= Monatsansicht ================= */
+
 export function MonthGrid(p: ViewProps) {
   const first = new Date(p.cursor.getFullYear(), p.cursor.getMonth(), 1);
   const start = startOfWeek(first);

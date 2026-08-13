@@ -8,7 +8,7 @@ import { doSignOut } from '@/lib/actions/auth';
 import { iso, parseISO } from '@/lib/dates';
 import { MiniCalendar } from './MiniCalendar';
 import {
-  IcoArrow, IcoCal, IcoCheck, IcoDoor, IcoDown, IcoEye, IcoInbox, IcoOut, IcoPlus, IcoUsers,
+  IcoArrow, IcoCal, IcoCheck, IcoDoor, IcoDown, IcoEye, IcoInbox, IcoMenu, IcoOut, IcoPlus, IcoUsers,
 } from './Icons';
 import { Toaster } from './Toast';
 
@@ -27,6 +27,7 @@ export function AppShell({ user, groups, pending, stale, today, topbar, children
   const allIds = useMemo(() => groups.flatMap((g) => g.rooms.map((r) => r.id)), [groups]);
   const [visible, setVisible] = useState<Set<number>>(() => new Set(allIds));
   const [known, setKnown] = useState<Set<number>>(() => new Set(allIds));
+  const [navOpen, setNavOpen] = useState(false);
 
   /* Neu angelegte Räume sind sofort sichtbar, ohne bereits abgewählte wieder einzublenden */
   useEffect(() => {
@@ -38,6 +39,9 @@ export function AppShell({ user, groups, pending, stale, today, topbar, children
   const path = usePathname();
   const router = useRouter();
   const params = useSearchParams();
+
+  /* Drawer bei jedem Seitenwechsel auf dem Handy wieder schließen */
+  useEffect(() => { setNavOpen(false); }, [path]);
   const admin = user.role === 'ADMIN';
   const initials = user.name.split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase();
 
@@ -67,6 +71,9 @@ export function AppShell({ user, groups, pending, stale, today, topbar, children
     <VisibilityCtx.Provider value={visible}>
       <div id="app" className="on">
         <div className="topbar">
+          <button className="icon-btn menu-btn" aria-label="Menü" onClick={() => setNavOpen((v) => !v)}>
+            <IcoMenu />
+          </button>
           {topbar ?? <div className="tb-left" />}
           <div className="tb-right">
             <div className="role-pill">
@@ -77,19 +84,21 @@ export function AppShell({ user, groups, pending, stale, today, topbar, children
         </div>
 
         <div className="body">
-          <aside className="sidebar">
+          <div className={`sidebar-scrim${navOpen ? ' on' : ''}`} onClick={() => setNavOpen(false)} />
+          <aside className={`sidebar${navOpen ? ' open' : ''}`}>
             <div className="sb-scroll">
               <div className="brand">
                 <div className="mark"><IcoCal s={15} /></div>
                 <div><b>Paulushaus</b><small>Raumplaner</small></div>
               </div>
 
-              <Link href={`/?d=${iso(cursor)}&v=${view}&new=1`} className="btn btn-primary new-btn">
+              <Link href={`/?d=${iso(cursor)}&v=${view}&new=1`} className="btn btn-primary new-btn"
+                onClick={() => setNavOpen(false)}>
                 <IcoPlus /> <span>{admin ? 'Termin anlegen' : 'Termin anfragen'}</span>
               </Link>
 
               <MiniCalendar cursor={cursor} today={parseISO(today)} view={view}
-                onPick={(d) => router.push(`/?d=${d}&v=${view}`)} />
+                onPick={(d) => { router.push(`/?d=${d}&v=${view}`); setNavOpen(false); }} />
 
               <div className="sb-label">Kalender / Räume</div>
               <div>
