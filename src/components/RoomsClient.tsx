@@ -26,12 +26,17 @@ export function RoomsClient({ groups, allGroups, counts, monthLabel }: {
   const submit = () => {
     if (!edit) return;
     setErr('');
+    const color = (edit.color ?? '').trim();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+      setErr('Bitte eine gültige Farbe wählen (Hex-Code z. B. #4A90D9).');
+      return;
+    }
     start(async () => {
       try {
         await saveRoom({
           id: edit.id,
           name: edit.name ?? '',
-          color: edit.color ?? PALETTE[0],
+          color,
           capacity: edit.capacity ?? 0,
           equipment: edit.equipment ?? '',
           groupId: newGroup ? null : (edit.groupId ?? null),
@@ -144,7 +149,17 @@ export function RoomsClient({ groups, allGroups, counts, monthLabel }: {
                 <button key={c} className={`sw-dot${edit.color === c ? ' on' : ''}`}
                   style={{ background: c, width: 26, height: 26 }} onClick={() => setEdit({ ...edit, color: c })} />
               ))}
-            </div></div>
+              <label className={`sw-dot custom${edit.color && !PALETTE.includes(edit.color) ? ' on' : ''}`}
+                style={{ width: 26, height: 26, background: edit.color && !PALETTE.includes(edit.color) ? edit.color : undefined }}
+                title="Eigene Farbe wählen">
+                <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(edit.color ?? '') ? edit.color : PALETTE[0]}
+                  onChange={(e) => setEdit({ ...edit, color: e.target.value })} />
+              </label>
+            </div>
+            <input className="input" style={{ marginTop: 8, maxWidth: 140, fontVariantNumeric: 'tabular-nums' }}
+              value={edit.color ?? ''} placeholder="#RRGGBB" maxLength={7}
+              onChange={(e) => setEdit({ ...edit, color: e.target.value })} />
+          </div>
           <div className="field"><label>Öffentliche Ansicht</label>
             <div className="seg-mini">
               <button className={edit.isPublic !== false ? 'on' : ''} onClick={() => setEdit({ ...edit, isPublic: true })}>Anzeigen</button>

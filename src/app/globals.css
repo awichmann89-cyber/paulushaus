@@ -388,6 +388,14 @@ tbody tr:hover{background:rgba(0,122,255,.03)}
 .room-card .swatches{display:flex;gap:5px;margin-top:12px}
 .sw-dot{width:18px;height:18px;border-radius:50%;border:2px solid transparent}
 .sw-dot.on{border-color:var(--text);outline:2px solid #fff;outline-offset:-4px}
+.sw-dot.custom{
+  position:relative;overflow:hidden;cursor:pointer;display:inline-flex;
+  background:conic-gradient(from 180deg,#ff3b30,#ff9f0a,#ffd60a,#34c759,#007aff,#af52de,#ff3b30);
+}
+.sw-dot.custom input[type=color]{
+  position:absolute;inset:-4px;width:calc(100% + 8px);height:calc(100% + 8px);
+  border:none;padding:0;cursor:pointer;opacity:0;
+}
 
 /* ---------- Modal ---------- */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.28);backdrop-filter:blur(3px);z-index:60;display:none;align-items:center;justify-content:center;padding:24px}
