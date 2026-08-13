@@ -8,7 +8,7 @@ import { DetailModal } from './DetailModal';
 import { useVisibleRooms } from './AppShell';
 import { groupOf } from '@/lib/group';
 import type { Ev, RoomView } from '@/lib/calendar';
-import { parseISO } from '@/lib/dates';
+import { addDays, iso, parseISO } from '@/lib/dates';
 
 export function CalendarClient({ events, rooms, admin, cursor, view, today }: {
   events: Ev[]; rooms: RoomView[]; admin: boolean; cursor: string; view: string; today: string;
@@ -45,6 +45,7 @@ export function CalendarClient({ events, rooms, admin, cursor, view, today }: {
     onCreate: (x: { date: string; start: string; end: string }) =>
       setDraft({ date: x.date, start: x.start, endTime: x.end }),
     onPickDay: (d: string) => go(d, 'day'),
+    onSwipe: (dir: -1 | 1) => go(iso(addDays(cur, (view === 'day' ? 1 : 7) * dir)), view),
   };
 
   return (

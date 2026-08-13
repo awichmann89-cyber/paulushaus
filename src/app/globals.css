@@ -209,7 +209,6 @@ button{cursor:pointer;border:none;background:none}
 .cal-head{
   display:grid;flex:none;border-bottom:1px solid var(--hairline);
   background:rgba(255,255,255,.9);backdrop-filter:blur(10px);z-index:6;
-  position:sticky;top:0;left:0;
 }
 .cal-head .corner{border-right:1px solid var(--hairline)}
 .dayhead{padding:8px 6px 9px;text-align:center;border-right:1px solid var(--hairline)}

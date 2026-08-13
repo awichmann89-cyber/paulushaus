@@ -20,6 +20,8 @@ export interface ViewProps {
   onOpen?: (id: number) => void;
   onCreate?: (d: { date: string; start: string; end: string }) => void;
   onPickDay?: (dateISO: string) => void;
+  /** Wischgeste auf dem Handy: -1 = zurück, 1 = weiter (wie in nativen Kalender-Apps) */
+  onSwipe?: (dir: -1 | 1) => void;
 }
 
 const roomOf = (rooms: RoomView[], id: number) => rooms.find((r) => r.id === id);
@@ -66,8 +68,27 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
   const now = useNow();
   const nowMin = now ? now.getHours() * 60 + now.getMinutes() : -1;
 
+  /* Wischgeste zum Blättern (Handy) – nur auslösen, wenn die Bewegung klar
+     waagerecht, weit und schnell genug war, damit senkrechtes Scrollen durch
+     die Stunden und normales Antippen von Terminen unangetastet bleiben. */
+  const touchRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s = touchRef.current;
+    touchRef.current = null;
+    if (!s || !p.onSwipe) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x, dy = t.clientY - s.y, dt = Date.now() - s.t;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4 && dt < 700) {
+      p.onSwipe(dx < 0 ? 1 : -1);
+    }
+  };
+
   return (
-    <div className="cal-scroll" ref={scrollRef}>
+    <>
       <div className="cal-head" style={{ gridTemplateColumns: cols }}>
         <div className="corner" />
         {Array.from({ length: days }, (_, i) => {
@@ -81,7 +102,8 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
         })}
       </div>
 
-      <div className="cal-grid" style={{ gridTemplateColumns: cols, height: (HOUR_END - HOUR_START) * ROW }}>
+      <div className="cal-scroll" ref={scrollRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div className="cal-grid" style={{ gridTemplateColumns: cols, height: (HOUR_END - HOUR_START) * ROW }}>
           <div className="times">
             {Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => {
               const h = HOUR_START + i;
@@ -166,6 +188,7 @@ export function WeekGrid({ days, ...p }: ViewProps & { days: 1 | 7 }) {
           })}
         </div>
       </div>
+    </>
   );
 }
 

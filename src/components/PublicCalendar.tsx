@@ -50,7 +50,10 @@ export function PublicCalendar({ events, rooms, cursor, view, today, kiosk }: {
   } else if (view === 'month') title = `${MON[cur.getMonth()]} ${cur.getFullYear()}`;
   else title = longDate(cur);
 
-  const props = { events, rooms, groups, cursor: cur, today: now, pub: true };
+  const props = {
+    events, rooms, groups, cursor: cur, today: now, pub: true,
+    onSwipe: (dir: -1 | 1) => shift(dir),
+  };
 
   return (
     <div id="public" className={`on${kiosk ? ' kiosk' : ''}`}>
