@@ -42,6 +42,7 @@ export function RoomsClient({ groups, allGroups, counts, monthLabel }: {
           groupId: newGroup ? null : (edit.groupId ?? null),
           newGroupName: newGroup || undefined,
           isPublic: edit.isPublic ?? true,
+          planSheet: edit.planSheet ?? '',
         });
         setEdit(null); setNewGroup(''); router.refresh();
         toast(edit.id ? 'Raum gespeichert' : `Raum „${edit.name}“ angelegt – Kalender aktiv`);
@@ -167,6 +168,12 @@ export function RoomsClient({ groups, allGroups, counts, monthLabel }: {
             </div>
             <div className="hint"><IcoInfo s={13} />
               <span>Verborgene Räume erscheinen nicht im öffentlichen Belegungsplan – z. B. interne Besprechungsräume.</span></div>
+          </div>
+          <div className="field"><label>Blatt im Excel-Jahresplan</label>
+            <input className="input" value={edit.planSheet ?? ''} placeholder="z. B. SAAL" style={{ maxWidth: 200 }}
+              onChange={(e) => setEdit({ ...edit, planSheet: e.target.value })} />
+            <div className="hint"><IcoInfo s={13} />
+              <span>Name des Blatts ohne Jahreszahl. Der Import ordnet „SAAL 26“ darüber diesem Raum zu, der Export benennt das Blatt so.</span></div>
           </div>
           {err && <div className="err">{err}</div>}
         </Modal>

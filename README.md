@@ -33,6 +33,12 @@ Einzelne Räume lassen sich in der Raumverwaltung von der öffentlichen Ansicht 
 **Export & Druck** – Monatslisten je Raum, einzeln oder mehrere zusammen als PDF (eine A4-Seite pro Raum).
 Pro Raum wird angezeigt, ob sich der Plan seit dem letzten Export geändert hat.
 
+**Excel-Jahresplan** – `/plan`, nur Admins. Ein Jahr als Excel-Liste herunterladen, im gleichen
+Aufbau wie die bisherigen Belegungspläne (ein Blatt je Raum, z. B. `SAAL 26`, eine Zeile je Tag),
+oder eine bearbeitete Liste wieder einspielen. Der Import zeigt vorher je Blatt, welchem Raum es
+zugeordnet wird, wie viele Termine entstehen und welche Zeilen ausgelegt werden mussten.
+Er **ersetzt den vorigen Import desselben Jahres**; von Hand angelegte Termine bleiben unberührt.
+
 ---
 
 ## Deployment auf Vercel
@@ -205,11 +211,31 @@ angelegt. Danach legt man sie neu an.
 Die Konfliktprüfung liegt in `src/lib/conflicts.ts` und ist absichtlich **keine** Server
 Action – exportiert aus einer `'use server'`-Datei wäre sie vom Browser aus aufrufbar.
 
-### Einmal-Import der alten Excel-Belegungspläne
+### Excel-Jahresplan: Import und Export
 
-`scripts/import-belegungsplan.ts` übernimmt die Jahrespläne aus Excel
-(Blätter SAAL / ROT / BLAU / VIOLETT / PURPUR). Das Skript ist **kein Teil der App**
-und läuft **nicht im Build** – es wird nur von Hand aufgerufen.
+Die Excel-Pläne (Blätter SAAL / ROT / BLAU / VIOLETT / PURPUR) lassen sich in der App unter
+**Excel-Jahresplan** (`/plan`) importieren und exportieren. Lesen und Schreiben liegen in
+`src/lib/plan/` (`parse.ts`, `write.ts`, `import.ts`); App und Kommandozeilen-Skript benutzen
+denselben Parser.
+
+- **Zuordnung Blatt → Raum** steht in `rooms.plan_sheet` (z. B. `SAAL`), pflegbar in der
+  Raumverwaltung. Der Import benutzt sie zuerst und fällt sonst auf den Namensvergleich zurück;
+  die im Import gewählte Zuordnung wird dort gespeichert. Der Export benennt die Blätter danach.
+- **Kennung je Jahr**: `belegungsplan-<Jahr>`, das Jahr ergibt sich aus den Daten der Datei.
+  Ein erneuter Import löscht alle Termine dieser Kennung und schreibt die neuen, in einer
+  Transaktion. Wurden importierte Termine in der App geändert oder abgesagt, warnt die Vorschau –
+  diese Änderungen gehen beim Ersetzen verloren.
+- **Export → Import ist verlustfrei.** Durchgehende Termine werden als `18:00 | ganztägig`,
+  `ganztägig`, `bis | 12:00` geschrieben, die Notiz wieder auf Anmerkungen, Ansprechperson und
+  Träger verteilt. Exportiert werden bestätigte Termine; „täglich wiederkehrende“ Termine kommen
+  als einzelne Tageszeilen zurück.
+- Upload-Grenze 4 MB (`next.config.mjs`), die Jahrespläne liegen bei etwa 150 KB.
+
+### Import per Kommandozeile
+
+`scripts/import-belegungsplan.ts` macht dasselbe ohne Oberfläche, mit Bericht als Markdown-Datei.
+Das Skript ist **kein Teil der App** und läuft **nicht im Build** – es wird nur von Hand aufgerufen.
+Anders als die App ersetzt es nicht, sondern bricht ab, wenn die Kennung schon existiert.
 
 ```bash
 # 1. Trockenlauf: schreibt nichts, erzeugt nur einen Bericht
@@ -248,6 +274,7 @@ im Bericht, damit sie nachprüfbar ist:
 | Fall in der Tabelle | Übernahme |
 |---|---|
 | `ganztägig` | 07:00–23:00, passend zum Zeitraster der App |
+| `18:00` bis `ganztägig` | ab 18:00, Beginn eines durchgehenden Termins |
 | Zeile ohne jede Uhrzeit (`Karfreitag`, `freihalten`) | Platzhalter 09:00–10:00 |
 | Startzeit ohne Endzeit | plus 2 Stunden |
 | Endzeit ≤ Startzeit (z. B. Ende `00:00`) | bis 23:00 |

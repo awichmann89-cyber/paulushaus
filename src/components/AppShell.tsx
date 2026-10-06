@@ -8,7 +8,7 @@ import { doSignOut } from '@/lib/actions/auth';
 import { iso, parseISO } from '@/lib/dates';
 import { MiniCalendar } from './MiniCalendar';
 import {
-  IcoArrow, IcoCal, IcoCheck, IcoDoor, IcoDown, IcoEye, IcoInbox, IcoMenu, IcoOut, IcoPlus, IcoUsers,
+  IcoArrow, IcoCal, IcoCheck, IcoDoor, IcoDown, IcoEye, IcoInbox, IcoMenu, IcoOut, IcoPlus, IcoSheet, IcoUsers,
 } from './Icons';
 import { Toaster } from './Toast';
 
@@ -62,6 +62,7 @@ export function AppShell({ user, groups, pending, stale, today, topbar, children
     ? [['/', 'Kalender', <IcoCal key="c" />, 0],
        ['/requests', 'Anfragen', <IcoInbox key="i" />, pending],
        ['/export', 'Export & Druck', <IcoDown key="d" />, stale],
+       ['/plan', 'Excel-Jahresplan', <IcoSheet key="x" />, 0],
        ['/users', 'Nutzer', <IcoUsers key="u" />, 0],
        ['/rooms', 'Räume', <IcoDoor key="r" />, 0]]
     : [['/', 'Kalender', <IcoCal key="c" />, 0],

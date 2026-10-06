@@ -14,6 +14,7 @@ export interface RoomInput {
   groupId: number | null;
   newGroupName?: string;
   isPublic: boolean;
+  planSheet?: string;
 }
 
 export async function saveRoom(input: RoomInput) {
@@ -32,6 +33,7 @@ export async function saveRoom(input: RoomInput) {
   const values = {
     name: input.name.trim(), color: input.color, capacity: input.capacity || 0,
     equipment: input.equipment.trim(), groupId, isPublic: input.isPublic,
+    planSheet: input.planSheet?.trim().toUpperCase() || null,
   };
 
   if (input.id) await db.update(rooms).set(values).where(eq(rooms.id, input.id));

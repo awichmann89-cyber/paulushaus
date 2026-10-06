@@ -53,6 +53,9 @@ export const rooms = pgTable('rooms', {
   isActive: boolean('is_active').notNull().default(true),
   isPublic: boolean('is_public').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
+  /** Blattname im Excel-Belegungsplan ohne Jahr, z. B. „SAAL“. Der Import ordnet
+   *  Blätter darüber zu, der Export benennt die Blätter danach. */
+  planSheet: text('plan_sheet'),
 });
 
 /* Regel einer Terminserie. Die einzelnen Termine stehen trotzdem als eigene Zeilen

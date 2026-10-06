@@ -34,6 +34,8 @@ export interface RoomView {
   groupId: number | null;
   groupName: string;
   isPublic: boolean;
+  /** Blattname im Excel-Belegungsplan, z. B. „SAAL“ */
+  planSheet?: string | null;
 }
 export interface GroupView { id: number; name: string; rooms: RoomView[] }
 

@@ -443,6 +443,15 @@ tbody tr:hover{background:rgba(0,122,255,.03)}
 .exp-diff span{font-size:11.5px;color:#a86400}
 .exp-row .btn{padding:6px 12px;font-size:12.5px}
 
+/* ---------- Excel-Jahresplan ---------- */
+.plan-notes{margin-top:6px;font-size:12px}
+.plan-notes summary{cursor:pointer;color:var(--accent);font-size:12px}
+.plan-notes table{margin-top:8px;border-collapse:collapse;width:100%;font-size:11.5px;display:block;overflow-x:auto;max-height:320px;overflow-y:auto}
+.plan-notes th,.plan-notes td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--hairline);vertical-align:top}
+.plan-notes th{color:var(--text-2);font-weight:500;position:sticky;top:0;background:#fff}
+.plan-notes td:first-child,.plan-notes td:nth-child(2){white-space:nowrap}
+.plan-confirm{margin:4px 0 6px 18px;font-size:13px;line-height:1.7}
+
 /* ---------- Druckbogen ---------- */
 .sheet-wrap{max-height:52vh;overflow:auto;background:rgba(120,120,128,.09);border-radius:var(--r-m);padding:14px}
 .sheet{

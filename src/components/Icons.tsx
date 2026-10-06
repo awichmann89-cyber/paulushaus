@@ -41,3 +41,5 @@ export const IcoMenu = (p: { s?: number }) => (
   <S {...p}><path d="M4 7h16M4 12h16M4 17h16" /></S>);
 export const IcoRepeat = (p: { s?: number }) => (
   <S {...p}><path d="M17 2l4 4-4 4" /><path d="M3 11V9a3 3 0 013-3h15" /><path d="M7 22l-4-4 4-4" /><path d="M21 13v2a3 3 0 01-3 3H3" /></S>);
+export const IcoSheet = (p: { s?: number }) => (
+  <S {...p}><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M3 9h18M3 15h18M9 3v18" /></S>);

@@ -8,7 +8,7 @@ export async function getRooms(onlyPublic = false): Promise<RoomView[]> {
   const rows = await db
     .select({
       id: rooms.id, name: rooms.name, color: rooms.color, capacity: rooms.capacity,
-      equipment: rooms.equipment, groupId: rooms.groupId, isPublic: rooms.isPublic,
+      equipment: rooms.equipment, groupId: rooms.groupId, isPublic: rooms.isPublic, planSheet: rooms.planSheet,
       sortOrder: rooms.sortOrder, groupName: roomGroups.name, groupSort: roomGroups.sortOrder,
     })
     .from(rooms)
@@ -21,6 +21,7 @@ export async function getRooms(onlyPublic = false): Promise<RoomView[]> {
     .map((r) => ({
       id: r.id, name: r.name, color: r.color, capacity: r.capacity, equipment: r.equipment,
       groupId: r.groupId, groupName: r.groupName ?? 'Ohne Gruppe', isPublic: r.isPublic,
+      planSheet: r.planSheet,
     }));
 }
 
