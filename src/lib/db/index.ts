@@ -1,6 +1,7 @@
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from './schema';
+import { normalizeDatabaseUrl } from './url';
 
 type DB = ReturnType<typeof drizzle<typeof schema>>;
 let instance: DB | null = null;
@@ -15,7 +16,7 @@ function connect(): DB {
       );
     }
     // prepare:false und max:1 sind die richtigen Werte hinter einem Connection-Pooler (Neon, Supabase, Vercel Postgres)
-    const client = postgres(url, { prepare: false, max: 1, idle_timeout: 20 });
+    const client = postgres(normalizeDatabaseUrl(url).url, { prepare: false, max: 1, idle_timeout: 20 });
     instance = drizzle(client, { schema });
   }
   return instance;

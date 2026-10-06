@@ -13,6 +13,7 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { eq, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import * as schema from '../src/lib/db/schema';
+import { normalizeDatabaseUrl, maskUrl } from '../src/lib/db/url';
 
 const { users } = schema;
 
@@ -37,7 +38,9 @@ async function main() {
     return;
   }
 
-  const client = postgres(url, {
+  const { url: dsn, changed } = normalizeDatabaseUrl(url);
+  changed.forEach((c) => log(c));
+  const client = postgres(dsn, {
     max: 1, prepare: false, idle_timeout: 10, connect_timeout: 30,
     onnotice: () => {}, // "schema already exists, skipping" ist beim zweiten Lauf normal
   });
