@@ -73,10 +73,15 @@ export const bookings = pgTable(
     decisionNote: text('decision_note'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Nur für Datenübernahmen gesetzt (z. B. 'belegungsplan-2026').
+     *  Erlaubt es, einen Import gezielt zurückzunehmen, ohne von Hand
+     *  angelegte Termine anzufassen. In der App selbst nicht sichtbar. */
+    importSource: text('import_source'),
   },
   (t) => ({
     rangeIdx: index('bookings_range_idx').on(t.startDate, t.endDate),
     roomIdx: index('bookings_room_idx').on(t.roomId),
+    importIdx: index('bookings_import_idx').on(t.importSource),
   }),
 );
 

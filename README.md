@@ -183,6 +183,62 @@ den Exclusion-Constraint.
 Admin-Mail, nicht an den Anfragenden zurück. Sonst könnte man über wiederholte Anfragen
 herausfinden, wer wann welchen Raum belegt hat.
 
+### Einmal-Import der alten Excel-Belegungspläne
+
+`scripts/import-belegungsplan.ts` übernimmt die Jahrespläne aus Excel
+(Blätter SAAL / ROT / BLAU / VIOLETT / PURPUR). Das Skript ist **kein Teil der App**
+und läuft **nicht im Build** – es wird nur von Hand aufgerufen.
+
+```bash
+# 1. Trockenlauf: schreibt nichts, erzeugt nur einen Bericht
+npm run import:plan -- --file "…/2026_PaulusHaus BELEGUNGSPLAN.xlsx"
+
+# 2. Bericht lesen, Raumzuordnung und Auslegungen prüfen
+
+# 3. Schreiben
+npm run import:plan -- --file "…/2026er.xlsx" --file "…/2027er.xlsx" --commit
+
+# Falls etwas falsch war: gezielt zurücknehmen
+npm run import:plan -- --undo "belegungsplan-2026" --commit
+```
+
+| Option | Wirkung |
+|---|---|
+| `--file <pfad>` | Excel-Datei, mehrfach angebbar |
+| `--commit` | tatsächlich schreiben. Ohne diese Option passiert nichts |
+| `--map "SAAL=Großer Saal,ROT=Roter Raum"` | Blattname → Raumname, wenn die Automatik falsch zuordnet |
+| `--create-missing` | Räume anlegen, die sich nicht zuordnen lassen |
+| `--created-by <mail>` | Termine diesem Konto zuschreiben, Standard ist der erste Admin |
+| `--tag <name>` | Import-Kennung, Standard `belegungsplan-<Jahr>` |
+| `--undo <tag>` | alle Termine dieses Imports löschen |
+
+**Rücknehmbar durch eine Kennung.** Jeder importierte Termin bekommt in
+`bookings.import_source` die Kennung des Imports. `--undo` löscht genau diese Zeilen und
+lässt von Hand angelegte Termine unberührt. Die Spalte ist in der App nirgends sichtbar.
+
+**Raumzuordnung** läuft über einen Namensvergleich ohne Umlaute und Sonderzeichen:
+`ROT 26` findet `Roter Raum`, `PURPUR 27` findet `Purpurraum`. Passen mehrere Räume,
+nimmt das Skript den kürzesten Namen und schreibt einen Hinweis in den Bericht.
+
+**Auslegungen**, die das Skript vornimmt – jede einzelne davon steht mit Excel-Zeilennummer
+im Bericht, damit sie nachprüfbar ist:
+
+| Fall in der Tabelle | Übernahme |
+|---|---|
+| `ganztägig` | 07:00–23:00, passend zum Zeitraster der App |
+| Zeile ohne jede Uhrzeit (`Karfreitag`, `freihalten`) | Platzhalter 09:00–10:00 |
+| Startzeit ohne Endzeit | plus 2 Stunden |
+| Endzeit ≤ Startzeit (z. B. Ende `00:00`) | bis 23:00 |
+| `bis 15:00` als Startangabe | Fortsetzung vom Vortag |
+| Datumszelle leer (verbundene Zellen) | Datum der Zeile darüber |
+| Aufeinanderfolgende ganztägige Tage mit gleichem Titel | ein durchgehender Termin |
+| `Anmerkungen`, `Ansprechperson`, `Träger` | zusammen in die Notiz des Termins |
+
+**Dubletten** werden übersprungen: identischer Raum, Zeitraum und Titel wird nur einmal
+angelegt. Das ist nötig, weil sich die Jahrespläne am Jahreswechsel überlappen – der
+2027er-Plan enthält auch November und Dezember 2026 – und weil in den Blättern selbst
+einzelne Zeilen doppelt stehen.
+
 ### Löschen ist ein Soft Delete
 
 Abgesagte Termine bekommen `status = CANCELLED` und bleiben in der Datenbank. Nur so kann der
