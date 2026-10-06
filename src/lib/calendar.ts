@@ -19,6 +19,10 @@ export interface Ev {
   createdBy: string | null;
   createdById: number | null;
   updatedAt: string;
+  /** gesetzt, wenn der Termin zu einer Serie gehört */
+  seriesId?: number | null;
+  /** Regel der Serie als Text, z. B. „jede Woche am Di“ */
+  seriesText?: string | null;
 }
 
 export interface RoomView {

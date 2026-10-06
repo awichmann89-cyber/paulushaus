@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth';
 import { getRequests, getRooms } from '@/lib/data';
-import { findConflicts } from '@/lib/actions/bookings';
+import { conflictsFor } from '@/lib/conflicts';
 import { RequestList } from '@/components/RequestList';
 
 export const dynamic = 'force-dynamic';
@@ -13,16 +13,19 @@ export default async function RequestsPage() {
     getRequests(admin ? undefined : Number(session!.user.id)),
   ]);
 
-  const withConflicts = await Promise.all(list.map(async (e) => ({
-    ev: e,
-    conflicts: admin
-      ? await findConflicts({
-          id: e.id, roomId: e.roomId, title: e.title,
-          startDate: e.startDate, endDate: e.endDate,
-          startTime: e.startTime, endTime: e.endTime,
-          spanMode: e.spanMode, attendees: e.attendees,
-        })
-      : [],
+  /* Termine einer Serienanfrage zu einem Eintrag bündeln – sortiert ist schon nach Datum,
+     also ist der erste gefundene auch der erste Termin der Serie */
+  const groups = new Map<string, typeof list>();
+  for (const e of list) {
+    const key = e.seriesId ? `s${e.seriesId}` : `b${e.id}`;
+    groups.set(key, [...(groups.get(key) ?? []), e]);
+  }
+
+  const withConflicts = await Promise.all([...groups.values()].map(async (evs) => ({
+    ev: evs[0],
+    count: evs.length,
+    last: evs[evs.length - 1].startDate,
+    conflicts: admin ? await conflictsFor(evs, evs.map((e) => e.id)) : [],
   })));
 
   return (

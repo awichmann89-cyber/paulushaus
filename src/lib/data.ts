@@ -1,7 +1,8 @@
 import { and, asc, eq, gte, lte, ne, sql, inArray } from 'drizzle-orm';
-import { db, rooms, roomGroups, bookings, users, roomExports } from './db';
+import { db, rooms, roomGroups, bookings, bookingSeries, users, roomExports } from './db';
 import type { Ev, RoomView, GroupView } from './calendar';
 import { addDays, iso, parseISO, startOfWeek } from './dates';
+import { describe, type MonthlyMode } from './recurrence';
 
 export async function getRooms(onlyPublic = false): Promise<RoomView[]> {
   const rows = await db
@@ -39,26 +40,40 @@ export function groupRooms(list: RoomView[]): GroupView[] {
   return out;
 }
 
-const toEv = (b: typeof bookings.$inferSelect, name: string | null): Ev => ({
+type SeriesRow = typeof bookingSeries.$inferSelect;
+
+export const seriesText = (s: SeriesRow) => describe({
+  freq: s.freq, interval: s.interval,
+  weekdays: s.weekdays ? s.weekdays.split(',').map(Number) : undefined,
+  monthly: (s.monthlyMode ?? undefined) as MonthlyMode | undefined,
+  until: s.untilDate, count: s.count,
+}, s.anchorDate);
+
+const toEv = (b: typeof bookings.$inferSelect, name: string | null, s?: SeriesRow | null): Ev => ({
   id: b.id, roomId: b.roomId, title: b.title, note: b.note,
   startDate: b.startDate, endDate: b.endDate,
   startTime: b.startTime, endTime: b.endTime,
   spanMode: b.spanMode, status: b.status, attendees: b.attendees,
   createdBy: name, createdById: b.createdById,
   updatedAt: b.updatedAt.toISOString(),
+  seriesId: b.seriesId, seriesText: s ? seriesText(s) : null,
 });
+
+/** Termine samt Ersteller und Serienregel */
+const withMeta = () => db
+  .select({ b: bookings, name: users.name, s: bookingSeries })
+  .from(bookings)
+  .leftJoin(users, eq(bookings.createdById, users.id))
+  .leftJoin(bookingSeries, eq(bookings.seriesId, bookingSeries.id));
 
 /** Alle Termine, die den Zeitraum berühren – inklusive mehrtägiger, die hineinragen */
 export async function getBookings(from: string, to: string, opts?: { confirmedOnly?: boolean }): Promise<Ev[]> {
   const conds = [lte(bookings.startDate, to), gte(bookings.endDate, from), ne(bookings.status, 'REJECTED'), ne(bookings.status, 'CANCELLED')];
   if (opts?.confirmedOnly) conds.push(eq(bookings.status, 'CONFIRMED'));
-  const rows = await db
-    .select({ b: bookings, name: users.name })
-    .from(bookings)
-    .leftJoin(users, eq(bookings.createdById, users.id))
+  const rows = await withMeta()
     .where(and(...conds))
     .orderBy(asc(bookings.startDate), asc(bookings.startTime));
-  return rows.map((r) => toEv(r.b, r.name));
+  return rows.map((r) => toEv(r.b, r.name, r.s));
 }
 
 /** Sichtbarer Zeitraum je Ansicht – großzügig, damit Nachbarwochen mitkommen */
@@ -76,19 +91,20 @@ export function rangeFor(view: string, cursor: Date): { from: string; to: string
 export async function getPendingCount(userId?: number): Promise<number> {
   const conds = [eq(bookings.status, 'PENDING')];
   if (userId) conds.push(eq(bookings.createdById, userId));
-  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(bookings).where(and(...conds));
+  // Eine Serienanfrage zählt als eine Anfrage, nicht als 52
+  const [row] = await db
+    .select({ n: sql<number>`count(distinct coalesce(-${bookings.seriesId}, ${bookings.id}))::int` })
+    .from(bookings).where(and(...conds));
   return row?.n ?? 0;
 }
 
 export async function getRequests(userId?: number): Promise<Ev[]> {
   const conds = [eq(bookings.status, 'PENDING')];
   if (userId) conds.push(eq(bookings.createdById, userId));
-  const rows = await db
-    .select({ b: bookings, name: users.name })
-    .from(bookings).leftJoin(users, eq(bookings.createdById, users.id))
+  const rows = await withMeta()
     .where(and(...conds))
     .orderBy(asc(bookings.startDate), asc(bookings.startTime));
-  return rows.map((r) => toEv(r.b, r.name));
+  return rows.map((r) => toEv(r.b, r.name, r.s));
 }
 
 /** Bestätigte Termine eines Raums, die den Monat berühren */
@@ -96,15 +112,13 @@ export async function getMonthBookings(roomId: number, month: string): Promise<E
   const from = `${month}-01`;
   const first = parseISO(from);
   const to = iso(new Date(first.getFullYear(), first.getMonth() + 1, 0));
-  const rows = await db
-    .select({ b: bookings, name: users.name })
-    .from(bookings).leftJoin(users, eq(bookings.createdById, users.id))
+  const rows = await withMeta()
     .where(and(
       eq(bookings.roomId, roomId), eq(bookings.status, 'CONFIRMED'),
       lte(bookings.startDate, to), gte(bookings.endDate, from),
     ))
     .orderBy(asc(bookings.startDate), asc(bookings.startTime));
-  return rows.map((r) => toEv(r.b, r.name));
+  return rows.map((r) => toEv(r.b, r.name, r.s));
 }
 
 export interface ExportRow {

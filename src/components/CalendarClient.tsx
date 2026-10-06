@@ -75,7 +75,7 @@ export function CalendarClient({ events, rooms, admin, cursor, view, today }: {
               id: open.id, roomId: open.roomId, title: open.title, note: open.note ?? '',
               date: open.startDate, end: open.endDate,
               start: open.startTime.slice(0, 5), endTime: open.endTime.slice(0, 5),
-              attendees: open.attendees, spanMode: open.spanMode,
+              attendees: open.attendees, spanMode: open.spanMode, seriesId: open.seriesId ?? null,
             });
             setOpenId(null);
           }}

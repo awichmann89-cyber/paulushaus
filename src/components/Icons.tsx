@@ -39,3 +39,5 @@ export const IcoArrow = (p: { s?: number }) => (
   <S s={13} strokeWidth={2} {...p}><path d="M7 17L17 7M9 7h8v8" /></S>);
 export const IcoMenu = (p: { s?: number }) => (
   <S {...p}><path d="M4 7h16M4 12h16M4 17h16" /></S>);
+export const IcoRepeat = (p: { s?: number }) => (
+  <S {...p}><path d="M17 2l4 4-4 4" /><path d="M3 11V9a3 3 0 013-3h15" /><path d="M7 22l-4-4 4-4" /><path d="M21 13v2a3 3 0 01-3 3H3" /></S>);

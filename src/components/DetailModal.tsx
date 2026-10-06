@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Modal } from './Modal';
 import { toast } from './Toast';
-import { IcoClock, IcoDoor, IcoUser, IcoUsers } from './Icons';
+import { IcoClock, IcoDoor, IcoRepeat, IcoUser, IcoUsers } from './Icons';
 import { daysOf, isMulti, rangeText, type Ev, type RoomView } from '@/lib/calendar';
 import { clock, longDate, parseISO } from '@/lib/dates';
 import { cancelBooking, decideBooking } from '@/lib/actions/bookings';
@@ -15,9 +15,10 @@ export function DetailModal({ ev, room, admin, onClose, onEdit }: {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState('');
-  const run = (fn: () => Promise<unknown>, msg: string) =>
+  const [askCancel, setAskCancel] = useState(false);
+  const run = (fn: () => Promise<{ count?: number }>, msg: (n: number) => string) =>
     start(async () => {
-      try { await fn(); onClose(); router.refresh(); toast(msg); }
+      try { const res = await fn(); onClose(); router.refresh(); toast(msg(res.count ?? 1)); }
       catch (e) { setErr(e instanceof Error ? e.message : 'Aktion fehlgeschlagen.'); }
     });
 
@@ -40,16 +41,28 @@ export function DetailModal({ ev, room, admin, onClose, onEdit }: {
       footer={<>
         {admin && ev.status === 'PENDING' && <>
           <button className="btn btn-danger" disabled={pending}
-            onClick={() => run(() => decideBooking(ev.id, false), `„${ev.title}“ abgelehnt`)}>Ablehnen</button>
+            onClick={() => run(() => decideBooking(ev.id, false), (n) => `„${ev.title}“ abgelehnt${n > 1 ? ` (${n} Termine)` : ''}`)}>
+            {ev.seriesId ? 'Serie ablehnen' : 'Ablehnen'}</button>
           <button className="btn btn-ok" disabled={pending}
-            onClick={() => run(() => decideBooking(ev.id, true), `„${ev.title}“ bestätigt`)}>Annehmen</button>
+            onClick={() => run(() => decideBooking(ev.id, true), (n) => `„${ev.title}“ bestätigt${n > 1 ? ` (${n} Termine)` : ''}`)}>
+            {ev.seriesId ? 'Serie annehmen' : 'Annehmen'}</button>
         </>}
-        {admin && ev.status === 'CONFIRMED' && <>
+        {admin && ev.status === 'CONFIRMED' && askCancel && <>
+          <button className="btn btn-ghost" onClick={() => setAskCancel(false)}>Zurück</button>
           <button className="btn btn-danger" disabled={pending}
-            onClick={() => run(() => cancelBooking(ev.id), 'Termin abgesagt')}>Absagen</button>
+            onClick={() => run(() => cancelBooking(ev.id, 'one'), () => 'Termin abgesagt')}>Nur diesen</button>
+          <button className="btn btn-danger" disabled={pending}
+            onClick={() => run(() => cancelBooking(ev.id, 'following'), (n) => `${n} Termine abgesagt`)}>
+            Diesen und alle folgenden</button>
+        </>}
+        {admin && ev.status === 'CONFIRMED' && !askCancel && <>
+          <button className="btn btn-danger" disabled={pending}
+            onClick={() => ev.seriesId
+              ? setAskCancel(true)
+              : run(() => cancelBooking(ev.id), () => 'Termin abgesagt')}>Absagen</button>
           <button className="btn btn-ghost" onClick={onEdit}>Bearbeiten</button>
         </>}
-        <button className="btn btn-primary" onClick={onClose}>Schließen</button>
+        {!askCancel && <button className="btn btn-primary" onClick={onClose}>Schließen</button>}
       </>}
     >
       <div className="info-line"><IcoClock />
@@ -65,6 +78,12 @@ export function DetailModal({ ev, room, admin, onClose, onEdit }: {
           </>}
         </div>
       </div>
+
+      {ev.seriesId && (
+        <div className="info-line"><IcoRepeat />
+          <div><b>Serientermin</b><small>{ev.seriesText}</small></div>
+        </div>
+      )}
 
       <div className="info-line"><IcoDoor />
         <div><b>{room?.name}</b>

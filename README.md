@@ -170,7 +170,7 @@ Damit „heute“ serverseitig stimmt, setzt `src/instrumentation.ts` die Zeitzo
 `Europe/Berlin` – Vercel-Funktionen laufen sonst in UTC.
 
 **Die Konfliktprüfung läuft in der Anwendung**, nicht als Datenbank-Constraint
-(`src/lib/actions/bookings.ts` → `findConflicts`). Grund: ein `EXCLUDE`-Constraint über einen
+(`src/lib/conflicts.ts`). Grund: ein `EXCLUDE`-Constraint über einen
 Zeitbereich kann „täglich wiederkehrend“ nicht abbilden, ohne jede Tagesinstanz zu
 materialisieren. Bei gleichzeitigen Eintragungen im selben Raum ist damit theoretisch eine
 Doppelbuchung möglich – für ein Haus mit einer Handvoll Admins ist das vertretbar. Wer das
@@ -182,6 +182,28 @@ den Exclusion-Constraint.
 `findConflicts` läuft auch bei Anfragen von Nutzern – das Ergebnis geht aber nur in die
 Admin-Mail, nicht an den Anfragenden zurück. Sonst könnte man über wiederholte Anfragen
 herausfinden, wer wann welchen Raum belegt hat.
+
+### Serientermine werden einzeln gespeichert
+
+Eine Wiederholung (täglich, wöchentlich an gewählten Wochentagen, monatlich am gleichen Tag
+oder am n-ten/letzten Wochentag, jährlich – jeweils mit Intervall und Ende per Datum, Anzahl
+oder gar nicht) erzeugt beim Speichern **eine Zeile je Termin** in `bookings`. Alle Zeilen
+zeigen über `series_id` auf `booking_series`, wo die Regel steht – die wird nur für die
+Anzeige („jeden 2. Dienstag“) gebraucht. Dadurch funktionieren Konfliktprüfung, Export, Druck
+und der öffentliche Plan pro Termin ohne Sonderfälle, und einzelne Termine einer Serie
+lassen sich absagen oder verschieben.
+
+Die Logik steht in `src/lib/recurrence.ts`; sie läuft auch im Browser für die Vorschau im
+Formular. Grenzen: höchstens 400 Termine je Serie, eine Serie ohne Ende wird für 2 Jahre
+angelegt. Danach legt man sie neu an.
+
+- **Anfrage** einer Serie: eine Admin-Mail, eine Karte unter „Anfragen“; Annehmen/Ablehnen
+  gilt für alle noch offenen Termine der Serie.
+- **Bearbeiten/Absagen**: „nur dieser Termin“ oder „dieser und alle folgenden“. Die Regel
+  selbst lässt sich nachträglich nicht ändern.
+
+Die Konfliktprüfung liegt in `src/lib/conflicts.ts` und ist absichtlich **keine** Server
+Action – exportiert aus einer `'use server'`-Datei wäre sie vom Browser aus aufrufbar.
 
 ### Einmal-Import der alten Excel-Belegungspläne
 
