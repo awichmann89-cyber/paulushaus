@@ -3,15 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MonthGrid, RoomTimeline, WeekGrid } from './CalendarViews';
-import { EventModal, type Draft } from './EventModal';
+import { EventModal, type Contact, type Draft } from './EventModal';
 import { DetailModal } from './DetailModal';
 import { useVisibleRooms } from './AppShell';
 import { groupOf } from '@/lib/group';
 import type { Ev, RoomView } from '@/lib/calendar';
 import { addDays, iso, parseISO } from '@/lib/dates';
 
-export function CalendarClient({ events, rooms, admin, cursor, view, today }: {
-  events: Ev[]; rooms: RoomView[]; admin: boolean; cursor: string; view: string; today: string;
+export function CalendarClient({ events, rooms, contacts, admin, cursor, view, today }: {
+  events: Ev[]; rooms: RoomView[]; contacts: Contact[]; admin: boolean; cursor: string; view: string; today: string;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -65,7 +65,7 @@ export function CalendarClient({ events, rooms, admin, cursor, view, today }: {
           : <WeekGrid {...props} days={view === 'day' ? 1 : 7} />}
       </div>
 
-      {draft && <EventModal draft={draft} rooms={rooms} admin={admin} onClose={() => setDraft(null)} />}
+      {draft && <EventModal draft={draft} rooms={rooms} contacts={contacts} admin={admin} onClose={() => setDraft(null)} />}
       {open && (
         <DetailModal
           ev={open} room={rooms.find((r) => r.id === open.roomId)} admin={admin}
@@ -76,6 +76,7 @@ export function CalendarClient({ events, rooms, admin, cursor, view, today }: {
               date: open.startDate, end: open.endDate,
               start: open.startTime.slice(0, 5), endTime: open.endTime.slice(0, 5),
               attendees: open.attendees, spanMode: open.spanMode, seriesId: open.seriesId ?? null,
+              contactId: open.contactId ?? null,
             });
             setOpenId(null);
           }}

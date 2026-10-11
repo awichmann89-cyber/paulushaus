@@ -52,6 +52,15 @@ export async function setUserRole(id: number, role: 'ADMIN' | 'USER') {
   return { ok: true as const };
 }
 
+/** Kürzel für die Monatslisten; leer heißt: Initialen aus dem Namen */
+export async function setUserShort(id: number, short: string) {
+  await requireAdmin();
+  const value = short.trim().slice(0, 8);
+  await db.update(users).set({ short: value || null }).where(eq(users.id, id));
+  revalidatePath('/', 'layout');
+  return { ok: true as const };
+}
+
 export async function setUserStatus(id: number, status: 'ACTIVE' | 'DISABLED') {
   const me = await requireAdmin();
   if (me.id === id) throw new Error('Du kannst deinen eigenen Zugang nicht sperren.');

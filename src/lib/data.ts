@@ -1,6 +1,7 @@
+import { alias } from 'drizzle-orm/pg-core';
 import { and, asc, eq, gte, lte, ne, sql, inArray } from 'drizzle-orm';
 import { db, rooms, roomGroups, bookings, bookingSeries, users, roomExports } from './db';
-import type { Ev, RoomView, GroupView } from './calendar';
+import { shortOf, type Ev, type RoomView, type GroupView } from './calendar';
 import { addDays, iso, parseISO, startOfWeek } from './dates';
 import { describe, type MonthlyMode } from './recurrence';
 
@@ -50,21 +51,36 @@ export const seriesText = (s: SeriesRow) => describe({
   until: s.untilDate, count: s.count,
 }, s.anchorDate);
 
-const toEv = (b: typeof bookings.$inferSelect, name: string | null, s?: SeriesRow | null): Ev => ({
+type Person = { name: string | null; short: string | null } | null;
+
+const toEv = (b: typeof bookings.$inferSelect, name: string | null, s?: SeriesRow | null, contact?: Person): Ev => ({
   id: b.id, roomId: b.roomId, title: b.title, note: b.note,
   startDate: b.startDate, endDate: b.endDate,
   startTime: b.startTime, endTime: b.endTime,
   spanMode: b.spanMode, status: b.status, attendees: b.attendees,
   createdBy: name, createdById: b.createdById,
+  contactId: b.contactId ?? b.createdById,
+  contact: contact?.name ?? name,
+  contactShort: contact?.name ? shortOf(contact.name, contact.short) : null,
   updatedAt: b.updatedAt.toISOString(),
   seriesId: b.seriesId, seriesText: s ? seriesText(s) : null,
 });
 
-/** Termine samt Ersteller und Serienregel */
+const contacts = alias(users, 'contacts');
+
+/** Termine samt Ersteller, Ansprechperson und Serienregel */
 const withMeta = () => db
-  .select({ b: bookings, name: users.name, s: bookingSeries })
+  .select({
+    b: bookings, name: users.name, s: bookingSeries,
+    // ohne eigene Ansprechperson gilt der Ersteller
+    c: {
+      name: sql<string | null>`coalesce(${contacts.name}, ${users.name})`,
+      short: sql<string | null>`case when ${contacts.id} is not null then ${contacts.short} else ${users.short} end`,
+    },
+  })
   .from(bookings)
   .leftJoin(users, eq(bookings.createdById, users.id))
+  .leftJoin(contacts, eq(bookings.contactId, contacts.id))
   .leftJoin(bookingSeries, eq(bookings.seriesId, bookingSeries.id));
 
 /** Alle Termine, die den Zeitraum berühren – inklusive mehrtägiger, die hineinragen */
@@ -74,7 +90,7 @@ export async function getBookings(from: string, to: string, opts?: { confirmedOn
   const rows = await withMeta()
     .where(and(...conds))
     .orderBy(asc(bookings.startDate), asc(bookings.startTime));
-  return rows.map((r) => toEv(r.b, r.name, r.s));
+  return rows.map((r) => toEv(r.b, r.name, r.s, r.c));
 }
 
 /** Sichtbarer Zeitraum je Ansicht – großzügig, damit Nachbarwochen mitkommen */
@@ -105,7 +121,7 @@ export async function getRequests(userId?: number): Promise<Ev[]> {
   const rows = await withMeta()
     .where(and(...conds))
     .orderBy(asc(bookings.startDate), asc(bookings.startTime));
-  return rows.map((r) => toEv(r.b, r.name, r.s));
+  return rows.map((r) => toEv(r.b, r.name, r.s, r.c));
 }
 
 /** Bestätigte Termine eines Raums, die den Monat berühren */
@@ -119,7 +135,7 @@ export async function getMonthBookings(roomId: number, month: string): Promise<E
       lte(bookings.startDate, to), gte(bookings.endDate, from),
     ))
     .orderBy(asc(bookings.startDate), asc(bookings.startTime));
-  return rows.map((r) => toEv(r.b, r.name, r.s));
+  return rows.map((r) => toEv(r.b, r.name, r.s, r.c));
 }
 
 export interface ExportRow {
@@ -163,6 +179,13 @@ export async function getExportStatus(month: string): Promise<ExportRow[]> {
       }));
     return { room, count, exportedAt: exp.exportedAt, changes };
   });
+}
+
+/** Personen, die als Ansprechperson wählbar sind */
+export async function getContacts(): Promise<{ id: number; name: string; short: string }[]> {
+  const rows = await db.select({ id: users.id, name: users.name, short: users.short })
+    .from(users).where(ne(users.status, 'DISABLED')).orderBy(asc(users.name));
+  return rows.map((u) => ({ id: u.id, name: u.name, short: shortOf(u.name, u.short) }));
 }
 
 export async function getUsers() {

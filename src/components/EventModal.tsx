@@ -30,10 +30,13 @@ export interface Draft {
   attendees?: number;
   spanMode?: SpanMode;
   seriesId?: number | null;
+  contactId?: number | null;
 }
 
-export function EventModal({ draft, rooms, admin, onClose }: {
-  draft: Draft; rooms: RoomView[]; admin: boolean; onClose: () => void;
+export interface Contact { id: number; name: string; short: string }
+
+export function EventModal({ draft, rooms, contacts, admin, onClose }: {
+  draft: Draft; rooms: RoomView[]; contacts: Contact[]; admin: boolean; onClose: () => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -48,6 +51,7 @@ export function EventModal({ draft, rooms, admin, onClose }: {
     endTime: draft.endTime,
     spanMode: (draft.spanMode ?? 'THROUGH') as SpanMode,
     attendees: draft.attendees ?? 10,
+    contactId: draft.contactId ?? 0,
   });
   const [rep, setRep] = useState({
     freq: 'NONE' as RecurFreq | 'NONE',
@@ -108,6 +112,7 @@ export function EventModal({ draft, rooms, admin, onClose }: {
           startTime: f.startTime, endTime: f.endTime,
           spanMode: multi ? f.spanMode : 'SINGLE',
           attendees: Number(f.attendees) || 0,
+          contactId: f.contactId || null,
           recurrence,
           scope: inSeries ? scope : undefined,
         });
@@ -292,6 +297,19 @@ export function EventModal({ draft, rooms, admin, onClose }: {
               nicht ändern – dafür die restlichen Termine absagen und die Serie neu anlegen.
             </span></div>
           )}
+        </div>
+      )}
+
+      {admin && (
+        <div className="field">
+          <label>Ansprechperson</label>
+          <select className="input" value={f.contactId} onChange={(e) => setF({ ...f, contactId: Number(e.target.value) })}>
+            {/* Ohne Auswahl gilt beim Anlegen der eigene Account, beim Bearbeiten bleibt sie unverändert */}
+            {!contacts.some((c) => c.id === f.contactId) && (
+              <option value={f.contactId}>{f.contactId ? 'Bisherige Ansprechperson' : 'Ich selbst'}</option>
+            )}
+            {contacts.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.short})</option>)}
+          </select>
         </div>
       )}
 

@@ -42,11 +42,11 @@ export default async function PrintPage({
               </div>
               <table className="sheet-table">
                 <thead>
-                  <tr><th>Tag</th><th>Uhrzeit</th><th>Belegung</th><th>Pers.</th><th>Verantwortlich</th></tr>
+                  <tr><th>Tag</th><th>Uhrzeit</th><th>Belegung</th><th>Ansprechperson</th></tr>
                 </thead>
                 <tbody>
                   {rows.length === 0 && (
-                    <tr><td colSpan={5} className="empty">Keine Termine in diesem Monat.</td></tr>
+                    <tr><td colSpan={4} className="empty">Keine Termine in diesem Monat.</td></tr>
                   )}
                   {rows.map((r, i) => {
                     const head = r.day !== last ? dayLabel(r.day) : '';
@@ -59,8 +59,7 @@ export default async function PrintPage({
                           {r.multi && <span className="mtag">durchgehend</span>}
                           {!r.multi && r.ev.spanMode === 'DAILY' && <span className="mtag">Serie</span>}
                         </td>
-                        <td className="p">{r.ev.attendees || '–'}</td>
-                        <td className="o">{r.ev.createdBy ?? '–'}</td>
+                        <td className="o">{r.ev.contactShort || '–'}</td>
                       </tr>
                     );
                   })}

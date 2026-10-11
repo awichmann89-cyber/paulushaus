@@ -18,6 +18,11 @@ export interface Ev {
   attendees: number;
   createdBy: string | null;
   createdById: number | null;
+  /** Ansprechperson – fällt auf den Ersteller zurück, wenn keine eigene gesetzt ist */
+  contactId?: number | null;
+  contact?: string | null;
+  /** Kürzel der Ansprechperson für die Monatslisten */
+  contactShort?: string | null;
   updatedAt: string;
   /** gesetzt, wenn der Termin zu einer Serie gehört */
   seriesId?: number | null;
@@ -38,6 +43,10 @@ export interface RoomView {
   planSheet?: string | null;
 }
 export interface GroupView { id: number; name: string; rooms: RoomView[] }
+
+/** Kürzel einer Person: das gepflegte, sonst die Initialen aus dem Namen */
+export const shortOf = (name: string, short?: string | null) =>
+  short?.trim() || name.split(/\s+/).filter(Boolean).map((p) => p[0]).join('').toUpperCase();
 
 export const isMulti = (e: Ev) => e.endDate !== e.startDate;
 /** durchgehend belegt (im Gegensatz zu täglich wiederkehrend) */

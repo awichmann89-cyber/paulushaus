@@ -23,6 +23,8 @@ export const users = pgTable(
     id: serial('id').primaryKey(),
     email: text('email').notNull(),
     name: text('name').notNull(),
+    /** Kürzel für die Monatslisten, z. B. „MS“. Leer = Initialen aus dem Namen */
+    short: text('short'),
     passwordHash: text('password_hash'),
     role: text('role').$type<Role>().notNull().default('USER'),
     status: text('status').$type<UserStatus>().notNull().default('INVITED'),
@@ -92,6 +94,8 @@ export const bookings = pgTable(
     status: text('status').$type<BookingStatus>().notNull().default('PENDING'),
     attendees: integer('attendees').notNull().default(0),
     createdById: integer('created_by_id').references(() => users.id, { onDelete: 'set null' }),
+    /** Ansprechperson für den Termin. Leer = wer den Termin angelegt hat */
+    contactId: integer('contact_id').references(() => users.id, { onDelete: 'set null' }),
     decidedById: integer('decided_by_id').references(() => users.id, { onDelete: 'set null' }),
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     decisionNote: text('decision_note'),

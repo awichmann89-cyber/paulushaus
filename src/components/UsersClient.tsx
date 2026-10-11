@@ -6,10 +6,11 @@ import { Modal } from './Modal';
 import { toast } from './Toast';
 import { IcoInfo, IcoPlus } from './Icons';
 import { niceStamp } from '@/lib/dates';
-import { inviteUser, resendInvite, setUserRole, setUserStatus } from '@/lib/actions/users';
+import { inviteUser, resendInvite, setUserRole, setUserShort, setUserStatus } from '@/lib/actions/users';
+import { shortOf } from '@/lib/calendar';
 
 interface U {
-  id: number; name: string; email: string;
+  id: number; name: string; short: string; email: string;
   role: 'ADMIN' | 'USER'; status: 'INVITED' | 'ACTIVE' | 'DISABLED';
   lastLoginAt: string | null;
 }
@@ -70,7 +71,7 @@ export function UsersClient({ users, roomCount, pending, meId }: {
         <div className="card">
           <table>
             <thead>
-              <tr><th>Nutzer</th><th>Rolle</th><th>Status</th><th>Letzter Login</th><th /></tr>
+              <tr><th>Nutzer</th><th>Kürzel</th><th>Rolle</th><th>Status</th><th>Letzter Login</th><th /></tr>
             </thead>
             <tbody>
               {users.map((u) => (
@@ -80,6 +81,14 @@ export function UsersClient({ users, roomCount, pending, meId }: {
                       <div className={`avatar${u.role === 'USER' ? ' u' : ''}`}>{ini(u.name)}</div>
                       <span><b>{u.name}</b><small>{u.email}</small></span>
                     </div>
+                  </td>
+                  <td>
+                    {/* Erscheint als Ansprechperson auf den Monatslisten */}
+                    <input className="input" style={{ padding: '5px 8px', width: 72, fontSize: 12.5 }}
+                      defaultValue={u.short} placeholder={shortOf(u.name)} maxLength={8} disabled={busy}
+                      onBlur={(e) => {
+                        if (e.target.value.trim() !== u.short) run(() => setUserShort(u.id, e.target.value), 'Kürzel gespeichert');
+                      }} />
                   </td>
                   <td>
                     <select className="input" style={{ padding: '5px 8px', width: 'auto', fontSize: 12.5 }}

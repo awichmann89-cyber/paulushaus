@@ -13,7 +13,7 @@ export default async function UsersPage() {
   return (
     <UsersClient
       users={list.map((u) => ({
-        id: u.id, name: u.name, email: u.email, role: u.role, status: u.status,
+        id: u.id, name: u.name, short: u.short ?? '', email: u.email, role: u.role, status: u.status,
         lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
       }))}
       roomCount={rooms.length}

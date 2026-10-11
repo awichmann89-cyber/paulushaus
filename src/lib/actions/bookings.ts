@@ -22,6 +22,8 @@ export interface BookingInput {
   endTime: string;
   spanMode: SpanMode;
   attendees: number;
+  /** Ansprechperson – nur Admins können sie wählen, sonst ist es der Anfragende */
+  contactId?: number | null;
   /** nur beim Anlegen: aus dem Termin eine Serie machen */
   recurrence?: Recurrence | null;
   /** nur beim Bearbeiten eines Serientermins */
@@ -66,6 +68,7 @@ export async function saveBooking(input: BookingInput) {
     endTime: input.endTime,
     spanMode,
     attendees: input.attendees || 0,
+    ...(admin && input.contactId ? { contactId: input.contactId } : {}),
     updatedAt: new Date(),
   };
 
@@ -128,6 +131,7 @@ export async function saveBooking(input: BookingInput) {
       status,
       seriesId,
       createdById: me.id,
+      contactId: s.contactId ?? me.id,
       decidedById: admin ? me.id : null,
       decidedAt: admin ? new Date() : null,
     })));
