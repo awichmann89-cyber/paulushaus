@@ -26,11 +26,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
 });
 
-/** Wirft, wenn niemand angemeldet ist – für Server Actions */
+/** Wirft, wenn niemand angemeldet ist – für Server Actions.
+ *  Das Login-Cookie kann älter sein als der Stand der Datenbank (Account gesperrt,
+ *  Datenbank neu aufgesetzt). Deshalb zählt, was in der Datenbank steht. */
 export async function requireUser() {
   const session = await auth();
-  if (!session?.user?.id) throw new Error('Nicht angemeldet.');
-  return { id: Number(session.user.id), name: session.user.name ?? '', role: session.user.role };
+  const id = Number(session?.user?.id);
+  if (!id) throw new Error('Nicht angemeldet.');
+  const [u] = await db.select({ id: users.id, name: users.name, role: users.role, status: users.status })
+    .from(users).where(eq(users.id, id)).limit(1);
+  if (!u || u.status !== 'ACTIVE') {
+    throw new Error('Deine Anmeldung ist nicht mehr gültig. Bitte abmelden und neu anmelden.');
+  }
+  return { id: u.id, name: u.name, role: u.role };
 }
 export async function requireAdmin() {
   const u = await requireUser();
