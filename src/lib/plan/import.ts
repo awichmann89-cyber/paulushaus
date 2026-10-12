@@ -1,10 +1,12 @@
 import ExcelJS from 'exceljs';
-import { and, asc, eq, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
-import { db, bookings, carriers, rooms, users } from '@/lib/db';
+import { and, asc, eq, inArray, isNotNull, isNull, ne, notExists, notInArray, or, sql } from 'drizzle-orm';
+import { db, bookings, bookingSeries, carriers, rooms, users } from '@/lib/db';
+import type { Recurrence } from '@/lib/recurrence';
 import {
   dupKey, fullNote, isSkippedSheet, looksLikeShort, matchPerson, matchRoom, mergeRuns, planYear,
   readSheet, sheetKey, sheetLabel, type Booking,
 } from './parse';
+import { detectSeries } from './series';
 
 /** Blattname → Raum-ID; 0 heißt „nicht importieren“ */
 export type SheetMapping = Record<string, number>;
@@ -19,6 +21,8 @@ export interface SheetPreview {
   dupes: number;
   skipped: number;                // Zeilen ohne Datum
   notes: { when: string; time: string; title: string; text: string; source: string }[];
+  /** erkannte regelmäßige Termine */
+  series: { title: string; time: string; text: string; count: number; missed: number }[];
 }
 
 export interface ImportPreview {
@@ -39,9 +43,11 @@ export interface ImportPreview {
   ambiguousContacts: string[];
 }
 
-/** carrier und newContact: Namen aus der Datei, beim Schreiben in IDs übersetzt */
-interface Analysis extends ImportPreview {
-  values: (typeof bookings.$inferInsert & { carrier: string; newContact: string })[];
+/** carrier und newContact: Namen aus der Datei, beim Schreiben in IDs übersetzt;
+ *  seriesIdx zeigt auf die erkannte Serie in `series` */
+export interface Analysis extends ImportPreview {
+  values: (typeof bookings.$inferInsert & { carrier: string; newContact: string; seriesIdx: number | null })[];
+  series: { rule: Recurrence; anchor: string }[];
 }
 
 const key = (name: string) => name.trim().toLowerCase();
@@ -100,6 +106,7 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
 
   const out: SheetPreview[] = [];
   const values: Analysis['values'] = [];
+  const series: Analysis['series'] = [];
   const now = new Date();
 
   for (const s of parsed) {
@@ -115,6 +122,7 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
     }
 
     let list: Booking[] = s.bookings, dupes = 0;
+    let found: ReturnType<typeof detectSeries> = [];
     if (roomId) {
       list = [];
       for (const b of s.bookings) {
@@ -123,7 +131,15 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
         seen.add(k);
         list.push(b);
       }
-      for (const b of list) {
+      // Serien erkennen und jedem Termin seine Serie mitgeben
+      found = detectSeries(list);
+      const seriesOf = new Map<number, number>();
+      for (const f of found) {
+        for (const m of f.members) seriesOf.set(m, series.length);
+        series.push({ rule: f.rule, anchor: f.anchor });
+      }
+
+      for (const [i, b] of list.entries()) {
         const ck = key(b.carrier);
         if (ck && !known.has(ck) && !newCarriers.has(ck)) newCarriers.set(ck, b.carrier);
 
@@ -137,6 +153,7 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
           contactId: typeof person === 'number' ? person : null,
           newContact: b.contact && person === null ? b.contact : '',
           carrier: b.carrier,
+          seriesIdx: seriesOf.get(i) ?? null,
           startDate: b.startDate, endDate: b.endDate, startTime: b.startTime, endTime: b.endTime,
           spanMode: b.spanMode, status: 'CONFIRMED', attendees: 0,
           decidedAt: now, importSource: tag,
@@ -156,6 +173,13 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
         text: b.notes.join('; '),
         source: b.sources.join(', '),
       })),
+      series: found.map((f) => {
+        const first = list[f.members[0]];
+        return {
+          title: first.title, time: `${first.startTime}–${first.endTime}`,
+          text: f.text, count: f.members.length, missed: f.missed,
+        };
+      }).sort((x, y) => x.title.localeCompare(y.title, 'de')),
     });
   }
 
@@ -168,6 +192,7 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
     newContacts: sorted(newContacts),
     ambiguousContacts: sorted(ambiguousContacts),
     values,
+    series,
   };
 }
 
@@ -176,10 +201,34 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
  * mit der Kennung und schreibt die neuen. Von Hand angelegte Termine bleiben unberührt.
  * Die gewählte Blatt-Zuordnung wird an den Räumen gespeichert.
  */
-export async function applyPlan(a: Analysis, userId: number) {
+export async function applyPlan(a: Analysis, userId: number, opts: { series: boolean }) {
   const mapped = a.sheets.filter((s) => s.roomId);
+  let seriesWritten = 0;
   await db.transaction(async (tx) => {
+    // Serien des vorigen Imports mit entfernen, sofern kein anderer Termin mehr dazugehört
+    const oldSeries = (await tx.selectDistinct({ id: bookings.seriesId }).from(bookings)
+      .where(and(eq(bookings.importSource, a.tag), isNotNull(bookings.seriesId)))).map((r) => r.id!);
     await tx.delete(bookings).where(eq(bookings.importSource, a.tag));
+    if (oldSeries.length) {
+      await tx.delete(bookingSeries).where(and(
+        inArray(bookingSeries.id, oldSeries),
+        notExists(tx.select({ x: sql`1` }).from(bookings).where(eq(bookings.seriesId, bookingSeries.id))),
+      ));
+    }
+
+    const seriesIds: number[] = [];
+    if (opts.series) {
+      for (const { rule: r, anchor } of a.series) {
+        const [row] = await tx.insert(bookingSeries).values({
+          freq: r.freq, interval: r.interval,
+          weekdays: r.freq === 'WEEKLY' && r.weekdays?.length ? r.weekdays.join(',') : null,
+          monthlyMode: r.freq === 'MONTHLY' ? r.monthly ?? 'DAY' : null,
+          anchorDate: anchor, untilDate: r.until ?? null, count: null,
+        }).returning({ id: bookingSeries.id });
+        seriesIds.push(row.id);
+      }
+      seriesWritten = seriesIds.length;
+    }
 
     // Fehlende Träger anlegen, dann alle Namen in IDs übersetzen
     const ids = new Map<string, number>();
@@ -205,8 +254,9 @@ export async function applyPlan(a: Analysis, userId: number) {
       contactIds.set(key(name), u.id);
     }
 
-    const rows = a.values.map(({ carrier, newContact, ...v }) => ({
+    const rows = a.values.map(({ carrier, newContact, seriesIdx, ...v }) => ({
       ...v,
+      seriesId: seriesIdx !== null ? seriesIds[seriesIdx] ?? null : null,
       contactId: v.contactId ?? (newContact ? contactIds.get(key(newContact)) ?? null : null),
       carrierId: carrier ? ids.get(key(carrier)) ?? null : null,
       createdById: userId, decidedById: userId,
@@ -222,6 +272,6 @@ export async function applyPlan(a: Analysis, userId: number) {
       await tx.update(rooms).set({ planSheet: s.label }).where(eq(rooms.id, s.roomId!));
     }
   });
-  return { written: a.total, removed: a.replaces, rooms: mapped.length };
+  return { written: a.total, removed: a.replaces, rooms: mapped.length, series: seriesWritten };
 }
 

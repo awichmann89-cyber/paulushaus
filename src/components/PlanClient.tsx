@@ -22,6 +22,8 @@ export function PlanClient({ thisYear, rooms, imports }: {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<Record<string, number>>({});
   const [confirm, setConfirm] = useState(false);
+  /** erkannte Serien anlegen – abschaltbar im Bestätigungsdialog */
+  const [asSeries, setAsSeries] = useState(true);
   const [err, setErr] = useState('');
   const [busy, start] = useTransition();
   const input = useRef<HTMLInputElement>(null);
@@ -63,10 +65,13 @@ export function PlanClient({ thisYear, rooms, imports }: {
     start(async () => {
       if (!file) return;
       try {
-        const res = await commitPlanImport(form(file, mapping));
+        const fd = form(file, mapping);
+        fd.set('series', asSeries ? '1' : '0');
+        const res = await commitPlanImport(fd);
         reset();
         router.refresh();
         toast(`Belegungsplan ${res.year} importiert – ${plural(res.written, 'Termin', 'Termine')}` +
+          (res.series ? `, davon ${plural(res.series, 'Serie', 'Serien')}` : '') +
           (res.removed ? `, ${res.removed} aus dem vorigen Import ersetzt` : ''));
       } catch (e) {
         setConfirm(false);
@@ -130,11 +135,25 @@ export function PlanClient({ thisYear, rooms, imports }: {
                     {room
                       ? <>{plural(s.count, 'Termin', 'Termine')}
                         {s.through > 0 && <>, {s.through} mehrtägig</>}
+                        {s.series.length > 0 && <>, {plural(s.series.length, 'Serie', 'Serien')} erkannt</>}
                         {s.dupes > 0 && <>, {plural(s.dupes, 'Dublette', 'Dubletten')} übersprungen</>}
                         {s.skipped > 0 && <>, {s.skipped} Zeilen ohne Datum verworfen</>}</>
                       : <>{plural(s.count, 'Termin', 'Termine')} – wird nicht importiert</>}
                     {s.ambiguous.length > 0 && <> · passt auch auf {s.ambiguous.join(', ')}</>}
                   </small>
+                  {room > 0 && s.series.length > 0 && (
+                    <details className="plan-notes">
+                      <summary>{plural(s.series.length, 'regelmäßiger Termin', 'regelmäßige Termine')} als Serie</summary>
+                      <table>
+                        <thead><tr><th>Titel</th><th>Zeit</th><th>Regel</th><th>Termine</th><th>Lücken</th></tr></thead>
+                        <tbody>
+                          {s.series.map((x, i) => (
+                            <tr key={i}><td>{x.title}</td><td>{x.time}</td><td>{x.text}</td><td>{x.count}</td><td>{x.missed || '–'}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </details>
+                  )}
                   {room > 0 && s.notes.length > 0 && (
                     <details className="plan-notes">
                       <summary>{plural(s.notes.length, 'Termin', 'Termine')} mit Auslegung</summary>
@@ -220,6 +239,16 @@ export function PlanClient({ thisYear, rooms, imports }: {
             <p className="hint"><IcoWarn s={13} />
               <span>{plural(preview.replaces, 'Termin', 'Termine')} aus dem vorigen Import für {preview.year} werden vorher gelöscht.</span></p>
           )}
+          {(() => {
+            const n = preview.sheets.filter((s) => mapping[s.sheet]).reduce((sum, s) => sum + s.series.length, 0);
+            return n > 0 && (
+              <label className="hint" style={{ cursor: 'pointer' }}>
+                <input type="checkbox" checked={asSeries} onChange={(e) => setAsSeries(e.target.checked)} />
+                <span>{plural(n, 'erkannte Serie', 'erkannte Serien')} anlegen. Serien lassen sich
+                  gemeinsam bearbeiten und absagen; Lücken wie Ferien bleiben frei, Ausreißer bleiben Einzeltermine.</span>
+              </label>
+            );
+          })()}
           {preview.newCarriers.length > 0 && (
             <p className="hint"><IcoInfo s={13} />
               <span>{preview.newCarriers.length === 1 ? 'Neuer Träger wird' : `${preview.newCarriers.length} neue Träger werden`} angelegt:{' '}

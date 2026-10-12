@@ -230,6 +230,13 @@ denselben Parser.
   (ein Wert wie `MS` auch als Kürzel), mehrdeutige bleiben als Text in der Notiz. Die Spalte
   `Träger` trifft einen Träger über den Namen, unbekannte werden angelegt. Die Vorschau nennt,
   was neu angelegt wird.
+- **Regelmäßige Termine** werden beim Import als Serie angelegt (abschaltbar im Bestätigungsdialog,
+  Erkennung in `src/lib/plan/series.ts`). Kandidaten sind eintägige Termine eines Raums mit gleichem
+  Titel und gleicher Uhrzeit; probiert werden wöchentlich (auch alle 2–4 Wochen, mehrere Wochentage),
+  monatlich am n-ten oder letzten Wochentag, monatlich am selben Tag und täglich. Eine Serie braucht
+  mindestens 4 Termine, und mindestens 70 % der Regeltermine müssen im Plan stehen – Ferien und
+  Feiertage bleiben als Lücken frei. Pausen über 10 Wochen beginnen eine neue Serie. Es entstehen
+  keine zusätzlichen Termine, Ausreißer bleiben Einzeltermine.
 - **Export → Import ist verlustfrei.** Durchgehende Termine werden als `18:00 | ganztägig`,
   `ganztägig`, `bis | 12:00` geschrieben, die Ansprechperson als Kürzel, der Träger mit Namen. Exportiert werden bestätigte Termine; „täglich wiederkehrende“ Termine kommen
   als einzelne Tageszeilen zurück.

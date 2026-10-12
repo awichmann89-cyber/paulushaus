@@ -16,7 +16,7 @@ async function read(fd: FormData) {
 /** Liest die Datei und zeigt, was der Import tun würde – schreibt nichts */
 export async function previewPlanImport(fd: FormData): Promise<ImportPreview> {
   await requireAdmin();
-  const { values: _values, ...preview } = await read(fd);
+  const { values: _values, series: _series, ...preview } = await read(fd);
   return preview;
 }
 
@@ -25,7 +25,7 @@ export async function commitPlanImport(fd: FormData) {
   const me = await requireAdmin();
   const analysis = await read(fd);
   if (!analysis.total) throw new Error('Keinem Blatt ist ein Raum zugeordnet – es gäbe nichts zu importieren.');
-  const res = await applyPlan(analysis, me.id);
+  const res = await applyPlan(analysis, me.id, { series: fd.get('series') !== '0' });
   revalidatePath('/', 'layout');
   return { ok: true as const, year: analysis.year, ...res };
 }
