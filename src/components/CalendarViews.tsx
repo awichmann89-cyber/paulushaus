@@ -407,7 +407,7 @@ export function RoomTimeline(p: ViewProps) {
                         {total < 2 && (
                           <em>
                             {g.l || g.r ? 'durchgehend belegt' : `${clock(e.startTime)}–${clock(e.endTime)}`}
-                            {p.pub ? '' : ` · ${e.contact ?? ''}`}
+                            {p.pub || !e.contact ? '' : ` · ${e.contact}`}
                           </em>
                         )}
                       </div>

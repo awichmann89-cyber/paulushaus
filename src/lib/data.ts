@@ -61,8 +61,9 @@ const toEv = (
   startTime: b.startTime, endTime: b.endTime,
   spanMode: b.spanMode, status: b.status, attendees: b.attendees,
   createdBy: name, createdById: b.createdById,
-  contactId: b.contactId ?? b.createdById,
-  contact: contact?.name ?? name,
+  // Importierte Termine ohne Ansprechperson bleiben leer – wer importiert hat, ist keine
+  contactId: b.contactId ?? (b.importSource ? null : b.createdById),
+  contact: contact?.name ?? null,
   contactShort: contact?.name ? shortOf(contact.name, contact.short) : null,
   carrierId: b.carrierId, carrier: carrier ?? null,
   updatedAt: b.updatedAt.toISOString(),
@@ -75,10 +76,12 @@ const contacts = alias(users, 'contacts');
 const withMeta = () => db
   .select({
     b: bookings, name: users.name, s: bookingSeries, carrier: carriers.name,
-    // ohne eigene Ansprechperson gilt der Ersteller
+    // ohne eigene Ansprechperson gilt der Ersteller – außer bei importierten Terminen
     c: {
-      name: sql<string | null>`coalesce(${contacts.name}, ${users.name})`,
-      short: sql<string | null>`case when ${contacts.id} is not null then ${contacts.short} else ${users.short} end`,
+      name: sql<string | null>`case when ${contacts.id} is not null then ${contacts.name}
+        when ${bookings.importSource} is null then ${users.name} end`,
+      short: sql<string | null>`case when ${contacts.id} is not null then ${contacts.short}
+        when ${bookings.importSource} is null then ${users.short} end`,
     },
   })
   .from(bookings)

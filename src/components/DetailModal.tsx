@@ -97,7 +97,7 @@ export function DetailModal({ ev, room, admin, onClose, onEdit }: {
       </div>
 
       <div className="info-line"><IcoUser />
-        <div><b>{ev.contact ?? 'Unbekannt'}</b>
+        <div><b>{ev.contact ?? 'Keine Ansprechperson'}</b>
           <small>Ansprechperson
             {ev.createdBy && ev.createdBy !== ev.contact
               ? ` · ${ev.status === 'PENDING' ? 'angefragt' : 'eingetragen'} von ${ev.createdBy}` : ''}</small></div>

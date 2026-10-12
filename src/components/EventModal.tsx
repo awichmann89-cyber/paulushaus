@@ -312,7 +312,7 @@ export function EventModal({ draft, rooms, contacts, carriers, admin, onClose }:
           <select className="input" value={f.contactId} onChange={(e) => setF({ ...f, contactId: Number(e.target.value) })}>
             {/* Ohne Auswahl gilt beim Anlegen der eigene Account, beim Bearbeiten bleibt sie unverändert */}
             {!contacts.some((c) => c.id === f.contactId) && (
-              <option value={f.contactId}>{f.contactId ? 'Bisherige Ansprechperson' : 'Ich selbst'}</option>
+              <option value={f.contactId}>{f.contactId ? 'Bisherige Ansprechperson' : draft.id ? '– keine –' : 'Ich selbst'}</option>
             )}
             {contacts.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.short})</option>)}
           </select>
