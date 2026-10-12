@@ -1,6 +1,6 @@
 import { alias } from 'drizzle-orm/pg-core';
 import { and, asc, eq, gte, lte, ne, sql, inArray } from 'drizzle-orm';
-import { db, rooms, roomGroups, bookings, bookingSeries, users, roomExports } from './db';
+import { db, rooms, roomGroups, bookings, bookingSeries, users, roomExports, carriers } from './db';
 import { shortOf, type Ev, type RoomView, type GroupView } from './calendar';
 import { addDays, iso, parseISO, startOfWeek } from './dates';
 import { describe, type MonthlyMode } from './recurrence';
@@ -53,7 +53,9 @@ export const seriesText = (s: SeriesRow) => describe({
 
 type Person = { name: string | null; short: string | null } | null;
 
-const toEv = (b: typeof bookings.$inferSelect, name: string | null, s?: SeriesRow | null, contact?: Person): Ev => ({
+const toEv = (
+  b: typeof bookings.$inferSelect, name: string | null, s?: SeriesRow | null, contact?: Person, carrier?: string | null,
+): Ev => ({
   id: b.id, roomId: b.roomId, title: b.title, note: b.note,
   startDate: b.startDate, endDate: b.endDate,
   startTime: b.startTime, endTime: b.endTime,
@@ -62,16 +64,17 @@ const toEv = (b: typeof bookings.$inferSelect, name: string | null, s?: SeriesRo
   contactId: b.contactId ?? b.createdById,
   contact: contact?.name ?? name,
   contactShort: contact?.name ? shortOf(contact.name, contact.short) : null,
+  carrierId: b.carrierId, carrier: carrier ?? null,
   updatedAt: b.updatedAt.toISOString(),
   seriesId: b.seriesId, seriesText: s ? seriesText(s) : null,
 });
 
 const contacts = alias(users, 'contacts');
 
-/** Termine samt Ersteller, Ansprechperson und Serienregel */
+/** Termine samt Ersteller, Ansprechperson, Träger und Serienregel */
 const withMeta = () => db
   .select({
-    b: bookings, name: users.name, s: bookingSeries,
+    b: bookings, name: users.name, s: bookingSeries, carrier: carriers.name,
     // ohne eigene Ansprechperson gilt der Ersteller
     c: {
       name: sql<string | null>`coalesce(${contacts.name}, ${users.name})`,
@@ -81,6 +84,7 @@ const withMeta = () => db
   .from(bookings)
   .leftJoin(users, eq(bookings.createdById, users.id))
   .leftJoin(contacts, eq(bookings.contactId, contacts.id))
+  .leftJoin(carriers, eq(bookings.carrierId, carriers.id))
   .leftJoin(bookingSeries, eq(bookings.seriesId, bookingSeries.id));
 
 /** Alle Termine, die den Zeitraum berühren – inklusive mehrtägiger, die hineinragen */
@@ -90,7 +94,7 @@ export async function getBookings(from: string, to: string, opts?: { confirmedOn
   const rows = await withMeta()
     .where(and(...conds))
     .orderBy(asc(bookings.startDate), asc(bookings.startTime));
-  return rows.map((r) => toEv(r.b, r.name, r.s, r.c));
+  return rows.map((r) => toEv(r.b, r.name, r.s, r.c, r.carrier));
 }
 
 /** Sichtbarer Zeitraum je Ansicht – großzügig, damit Nachbarwochen mitkommen */
@@ -121,7 +125,7 @@ export async function getRequests(userId?: number): Promise<Ev[]> {
   const rows = await withMeta()
     .where(and(...conds))
     .orderBy(asc(bookings.startDate), asc(bookings.startTime));
-  return rows.map((r) => toEv(r.b, r.name, r.s, r.c));
+  return rows.map((r) => toEv(r.b, r.name, r.s, r.c, r.carrier));
 }
 
 /** Bestätigte Termine eines Raums, die den Monat berühren */
@@ -135,7 +139,7 @@ export async function getMonthBookings(roomId: number, month: string): Promise<E
       lte(bookings.startDate, to), gte(bookings.endDate, from),
     ))
     .orderBy(asc(bookings.startDate), asc(bookings.startTime));
-  return rows.map((r) => toEv(r.b, r.name, r.s, r.c));
+  return rows.map((r) => toEv(r.b, r.name, r.s, r.c, r.carrier));
 }
 
 export interface ExportRow {
@@ -186,6 +190,25 @@ export async function getContacts(): Promise<{ id: number; name: string; short: 
   const rows = await db.select({ id: users.id, name: users.name, short: users.short })
     .from(users).where(ne(users.status, 'DISABLED')).orderBy(asc(users.name));
   return rows.map((u) => ({ id: u.id, name: u.name, short: shortOf(u.name, u.short) }));
+}
+
+/** Wählbare Träger für den Termin-Dialog */
+export async function getCarriers(): Promise<{ id: number; name: string }[]> {
+  return db.select({ id: carriers.id, name: carriers.name })
+    .from(carriers).where(eq(carriers.isActive, true)).orderBy(asc(carriers.name));
+}
+
+/** Alle Träger samt Anzahl ihrer Termine für die Verwaltungsseite */
+export async function getCarrierList() {
+  return db.select({
+    id: carriers.id, name: carriers.name, isActive: carriers.isActive,
+    total: sql<number>`count(${bookings.id})::int`,
+    upcoming: sql<number>`count(${bookings.id}) filter (where ${bookings.endDate} >= current_date)::int`,
+  })
+    .from(carriers)
+    .leftJoin(bookings, and(eq(bookings.carrierId, carriers.id), inArray(bookings.status, ['PENDING', 'CONFIRMED'])))
+    .groupBy(carriers.id)
+    .orderBy(sql`${carriers.isActive} desc`, asc(carriers.name));
 }
 
 export async function getUsers() {

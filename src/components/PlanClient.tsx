@@ -220,6 +220,22 @@ export function PlanClient({ thisYear, rooms, imports }: {
             <p className="hint"><IcoWarn s={13} />
               <span>{plural(preview.replaces, 'Termin', 'Termine')} aus dem vorigen Import für {preview.year} werden vorher gelöscht.</span></p>
           )}
+          {preview.newCarriers.length > 0 && (
+            <p className="hint"><IcoInfo s={13} />
+              <span>{preview.newCarriers.length === 1 ? 'Neuer Träger wird' : `${preview.newCarriers.length} neue Träger werden`} angelegt:{' '}
+                {preview.newCarriers.join(', ')}</span></p>
+          )}
+          {preview.newContacts.length > 0 && (
+            <p className="hint"><IcoInfo s={13} />
+              <span>{preview.newContacts.length === 1 ? 'Neue Ansprechperson wird' : `${preview.newContacts.length} neue Ansprechpersonen werden`}{' '}
+                als Kontakt ohne Zugang angelegt: {preview.newContacts.join(', ')}. Namen und Kürzel lassen sich
+                danach in der Nutzerverwaltung ergänzen.</span></p>
+          )}
+          {preview.ambiguousContacts.length > 0 && (
+            <p className="hint"><IcoWarn s={13} />
+              <span>Nicht eindeutig, bleibt als Text in der Notiz: {preview.ambiguousContacts.join(', ')}.
+                Passen mehrere Personen auf dasselbe Kürzel, hilft ein eigenes Kürzel in der Nutzerverwaltung.</span></p>
+          )}
           <p className="hint"><IcoInfo s={13} />
             <span>Die Zuordnung der Blätter wird an den Räumen gespeichert und beim nächsten Import und Export wieder benutzt.</span></p>
         </Modal>

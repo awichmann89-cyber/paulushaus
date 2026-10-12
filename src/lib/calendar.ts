@@ -23,6 +23,9 @@ export interface Ev {
   contact?: string | null;
   /** Kürzel der Ansprechperson für die Monatslisten */
   contactShort?: string | null;
+  /** Träger des Termins, z. B. ein Verein – frei wählbar aus den Stammdaten */
+  carrierId?: number | null;
+  carrier?: string | null;
   updatedAt: string;
   /** gesetzt, wenn der Termin zu einer Serie gehört */
   seriesId?: number | null;

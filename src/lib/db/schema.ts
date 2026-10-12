@@ -63,6 +63,15 @@ export const rooms = pgTable('rooms', {
   planSheet: text('plan_sheet'),
 });
 
+/* Träger eines Termins (Verein, Gruppe, Pfarrei …). Reine Stammdaten ohne Account.
+   Archivierte Träger bleiben an alten Terminen stehen, sind aber nicht mehr wählbar. */
+export const carriers = pgTable('carriers', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* Regel einer Terminserie. Die einzelnen Termine stehen trotzdem als eigene Zeilen
    in bookings – so funktionieren Konfliktprüfung, Export und Absagen pro Termin ohne
    Sonderfälle. Die Regel wird nur zur Anzeige („jeden 2. Dienstag“) gebraucht. */
@@ -99,6 +108,7 @@ export const bookings = pgTable(
     createdById: integer('created_by_id').references(() => users.id, { onDelete: 'set null' }),
     /** Ansprechperson für den Termin. Leer = wer den Termin angelegt hat */
     contactId: integer('contact_id').references(() => users.id, { onDelete: 'set null' }),
+    carrierId: integer('carrier_id').references(() => carriers.id, { onDelete: 'set null' }),
     decidedById: integer('decided_by_id').references(() => users.id, { onDelete: 'set null' }),
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     decisionNote: text('decision_note'),
@@ -137,3 +147,4 @@ export type RoomGroup = typeof roomGroups.$inferSelect;
 export type Booking = typeof bookings.$inferSelect;
 export type RoomExport = typeof roomExports.$inferSelect;
 export type BookingSeries = typeof bookingSeries.$inferSelect;
+export type Carrier = typeof carriers.$inferSelect;

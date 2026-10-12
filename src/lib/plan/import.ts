@@ -1,9 +1,9 @@
 import ExcelJS from 'exceljs';
 import { and, asc, eq, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
-import { db, bookings, rooms } from '@/lib/db';
+import { db, bookings, carriers, rooms, users } from '@/lib/db';
 import {
-  dupKey, isSkippedSheet, matchRoom, mergeRuns, planYear, readSheet, sheetKey, sheetLabel,
-  type Booking,
+  dupKey, fullNote, isSkippedSheet, looksLikeShort, matchPerson, matchRoom, mergeRuns, planYear,
+  readSheet, sheetKey, sheetLabel, type Booking,
 } from './parse';
 
 /** Blattname → Raum-ID; 0 heißt „nicht importieren“ */
@@ -31,9 +31,21 @@ export interface ImportPreview {
   replaces: number;
   /** davon nach dem Import in der App geändert oder abgesagt */
   editedSinceImport: number;
+  /** Träger aus der Datei, die es in der App noch nicht gibt – sie werden angelegt */
+  newCarriers: string[];
+  /** Ansprechpersonen, die keiner Person entsprechen – sie werden als Kontakt ohne Zugang angelegt */
+  newContacts: string[];
+  /** Ansprechpersonen, die auf mehrere Personen passen – sie bleiben als Text in der Notiz */
+  ambiguousContacts: string[];
 }
 
-interface Analysis extends ImportPreview { values: (typeof bookings.$inferInsert)[] }
+/** carrier und newContact: Namen aus der Datei, beim Schreiben in IDs übersetzt */
+interface Analysis extends ImportPreview {
+  values: (typeof bookings.$inferInsert & { carrier: string; newContact: string })[];
+}
+
+const key = (name: string) => name.trim().toLowerCase();
+const sorted = (m: Map<string, string>) => [...m.values()].sort((x, y) => x.localeCompare(y, 'de'));
 
 export const tagFor = (year: number) => `belegungsplan-${year}`;
 
@@ -79,19 +91,26 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
     edited: sql<number>`count(*) filter (where ${bookings.updatedAt} > ${bookings.createdAt} + interval '1 minute')::int`,
   }).from(bookings).where(eq(bookings.importSource, tag));
 
+  // Auch archivierte Träger zählen als bekannt – sonst entstünde eine Dublette
+  const known = new Set((await db.select({ name: carriers.name }).from(carriers)).map((c) => key(c.name)));
+  const newCarriers = new Map<string, string>();
+  const people = await db.select({ id: users.id, name: users.name, short: users.short }).from(users);
+  const newContacts = new Map<string, string>();
+  const ambiguousContacts = new Map<string, string>();
+
   const out: SheetPreview[] = [];
   const values: Analysis['values'] = [];
   const now = new Date();
 
   for (const s of parsed) {
-    const key = sheetKey(s.ws.name);
+    const sk = sheetKey(s.ws.name);
     let roomId: number | null;
     let ambiguous: string[] = [];
     if (mapping && s.ws.name in mapping) {
       roomId = mapping[s.ws.name] || null;
       if (roomId && !allRooms.some((r) => r.id === roomId)) throw new Error(`Unbekannter Raum für Blatt „${s.ws.name}“.`);
     } else {
-      const m = matchRoom(key, allRooms);
+      const m = matchRoom(sk, allRooms);
       roomId = m.room?.id ?? null; ambiguous = m.ambiguous;
     }
 
@@ -105,8 +124,19 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
         list.push(b);
       }
       for (const b of list) {
+        const ck = key(b.carrier);
+        if (ck && !known.has(ck) && !newCarriers.has(ck)) newCarriers.set(ck, b.carrier);
+
+        const person = b.contact ? matchPerson(b.contact, people) : null;
+        if (person === 'ambiguous') ambiguousContacts.set(key(b.contact), b.contact);
+        else if (b.contact && !person && !newContacts.has(key(b.contact))) newContacts.set(key(b.contact), b.contact);
+
         values.push({
-          roomId, title: b.title, note: b.note,
+          roomId, title: b.title,
+          note: person === 'ambiguous' ? fullNote(b.note, b.contact) : b.note,
+          contactId: typeof person === 'number' ? person : null,
+          newContact: b.contact && person === null ? b.contact : '',
+          carrier: b.carrier,
           startDate: b.startDate, endDate: b.endDate, startTime: b.startTime, endTime: b.endTime,
           spanMode: b.spanMode, status: 'CONFIRMED', attendees: 0,
           decidedAt: now, importSource: tag,
@@ -134,6 +164,9 @@ export async function analyzePlan(file: ArrayBuffer, fileName: string, mapping?:
     total: values.length,
     replaces: prev?.n ?? 0,
     editedSinceImport: prev?.edited ?? 0,
+    newCarriers: sorted(newCarriers),
+    newContacts: sorted(newContacts),
+    ambiguousContacts: sorted(ambiguousContacts),
     values,
   };
 }
@@ -147,7 +180,37 @@ export async function applyPlan(a: Analysis, userId: number) {
   const mapped = a.sheets.filter((s) => s.roomId);
   await db.transaction(async (tx) => {
     await tx.delete(bookings).where(eq(bookings.importSource, a.tag));
-    const rows = a.values.map((v) => ({ ...v, createdById: userId, decidedById: userId }));
+
+    // Fehlende Träger anlegen, dann alle Namen in IDs übersetzen
+    const ids = new Map<string, number>();
+    for (const c of await tx.select({ id: carriers.id, name: carriers.name }).from(carriers)) {
+      if (!ids.has(key(c.name))) ids.set(key(c.name), c.id);
+    }
+    for (const name of a.newCarriers) {
+      if (ids.has(key(name))) continue;
+      const [c] = await tx.insert(carriers).values({ name }).returning({ id: carriers.id });
+      ids.set(key(name), c.id);
+    }
+
+    // Unbekannte Ansprechpersonen als Kontakt ohne Zugang anlegen. „MS“ wird zugleich das
+    // Kürzel – so trifft der nächste Import die Person auch nach dem Ergänzen des vollen Namens.
+    const people = await tx.select({ id: users.id, name: users.name, short: users.short }).from(users);
+    const contactIds = new Map<string, number>();
+    for (const name of a.newContacts) {
+      const found = matchPerson(name, people);
+      if (typeof found === 'number') { contactIds.set(key(name), found); continue; }
+      const [u] = await tx.insert(users).values({
+        name, short: looksLikeShort(name) ? name : null, status: 'CONTACT',
+      }).returning({ id: users.id });
+      contactIds.set(key(name), u.id);
+    }
+
+    const rows = a.values.map(({ carrier, newContact, ...v }) => ({
+      ...v,
+      contactId: v.contactId ?? (newContact ? contactIds.get(key(newContact)) ?? null : null),
+      carrierId: carrier ? ids.get(key(carrier)) ?? null : null,
+      createdById: userId, decidedById: userId,
+    }));
     for (let i = 0; i < rows.length; i += 200) {
       await tx.insert(bookings).values(rows.slice(i, i + 200));
     }

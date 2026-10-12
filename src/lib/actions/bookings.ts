@@ -24,6 +24,8 @@ export interface BookingInput {
   attendees: number;
   /** Ansprechperson – nur Admins können sie wählen, sonst ist es der Anfragende */
   contactId?: number | null;
+  /** Träger aus den Stammdaten, leer = keiner */
+  carrierId?: number | null;
   /** nur beim Anlegen: aus dem Termin eine Serie machen */
   recurrence?: Recurrence | null;
   /** nur beim Bearbeiten eines Serientermins */
@@ -69,6 +71,7 @@ export async function saveBooking(input: BookingInput) {
     spanMode,
     attendees: input.attendees || 0,
     ...(admin && input.contactId ? { contactId: input.contactId } : {}),
+    carrierId: input.carrierId || null,
     updatedAt: new Date(),
   };
 

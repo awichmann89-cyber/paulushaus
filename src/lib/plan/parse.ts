@@ -206,6 +206,9 @@ export interface Booking {
   spanMode: 'SINGLE' | 'THROUGH';
   title: string;
   note: string | null;
+  /** Ansprechperson und Träger aus den gleichnamigen Spalten – die App führt beide als Stammdaten */
+  contact: string;
+  carrier: string;
   sources: string[];         // Excel-Zeilen, aus denen der Termin entstand
   notes: string[];
 }
@@ -220,15 +223,40 @@ export const norm = (s: string) => s.toLowerCase().replace(/[^a-zäöüß0-9]+/g
 const CONTACT = 'Ansprechperson: ';
 const CARRIER = 'Träger: ';
 
-function buildNote(r: Row): string | null {
+/** Notiz mit Ansprechperson und Träger als Text – für Wege, die keine Stammdaten kennen
+ *  oder einen Wert nicht eindeutig zuordnen können */
+export function fullNote(note: string | null, contact = '', carrier = ''): string | null {
   const parts: string[] = [];
-  if (r.note) parts.push(r.note);
-  if (r.contact) parts.push(`${CONTACT}${r.contact}`);
-  if (r.carrier) parts.push(`${CARRIER}${r.carrier}`);
+  if (note) parts.push(note);
+  if (contact) parts.push(`${CONTACT}${contact}`);
+  if (carrier) parts.push(`${CARRIER}${carrier}`);
   return parts.length ? parts.join(' · ') : null;
 }
 
-/** Umkehrung von buildNote – der Export verteilt die Notiz wieder auf die drei Spalten */
+/* ---------------------------------------------------------------- Personen-Zuordnung */
+
+export interface PersonRef { id: number; name: string; short: string | null }
+
+/** Initialen wie in der App (src/lib/calendar.ts → shortOf) */
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).map((p) => p[0]).join('');
+
+/**
+ * Wert der Spalte „Ansprechperson“ einer Person zuordnen: über das Kürzel, den vollen Namen
+ * oder die Initialen. Mehrere Treffer heißen „mehrdeutig“ – dann wird nichts verknüpft.
+ */
+export function matchPerson(value: string, people: PersonRef[]): number | 'ambiguous' | null {
+  const v = value.trim().toLowerCase();
+  if (!v) return null;
+  const hits = people.filter((p) => p.name.trim().toLowerCase() === v
+    || (p.short?.trim() || initials(p.name)).toLowerCase() === v);
+  if (hits.length > 1) return 'ambiguous';
+  return hits[0]?.id ?? null;
+}
+
+/** „MS“ ist ein Kürzel, „Frau Müller“ ein Name */
+export const looksLikeShort = (value: string) => !/\s/.test(value.trim()) && value.trim().length <= 4;
+
+/** Umkehrung von fullNote – der Export verteilt die Notiz wieder auf die drei Spalten */
 export function splitNote(note: string | null): { note: string; contact: string; carrier: string } {
   const out = { note: [] as string[], contact: '', carrier: '' };
   for (const p of (note ?? '').split(' · ')) {
@@ -276,7 +304,9 @@ export function mergeRuns(rows: Row[]): Booking[] {
         startTime: first.start, endTime: last.end,
         spanMode: 'THROUGH',
         title: first.title,
-        note: buildNote(first),
+        note: first.note || null,
+        contact: first.contact,
+        carrier: first.carrier,
         sources: run.map((r) => `${r.sheet}!${r.excelRow}`),
         notes: [
           `aus ${run.length} Zeilen zu einem durchgehenden Termin zusammengefasst`,
@@ -294,7 +324,9 @@ export function mergeRuns(rows: Row[]): Booking[] {
       startTime: r.start, endTime: r.end,
       spanMode: 'SINGLE',
       title: r.title,
-      note: buildNote(r),
+      note: r.note || null,
+      contact: r.contact,
+      carrier: r.carrier,
       sources: [`${r.sheet}!${r.excelRow}`],
       notes: r.notes,
     });

@@ -225,9 +225,13 @@ denselben Parser.
   Ein erneuter Import löscht alle Termine dieser Kennung und schreibt die neuen, in einer
   Transaktion. Wurden importierte Termine in der App geändert oder abgesagt, warnt die Vorschau –
   diese Änderungen gehen beim Ersetzen verloren.
+- **Ansprechperson und Träger** sind Stammdaten. Die Spalte `Ansprechperson` trifft eine Person
+  über Kürzel, vollen Namen oder Initialen; unbekannte werden als Kontakt ohne Zugang angelegt
+  (ein Wert wie `MS` auch als Kürzel), mehrdeutige bleiben als Text in der Notiz. Die Spalte
+  `Träger` trifft einen Träger über den Namen, unbekannte werden angelegt. Die Vorschau nennt,
+  was neu angelegt wird.
 - **Export → Import ist verlustfrei.** Durchgehende Termine werden als `18:00 | ganztägig`,
-  `ganztägig`, `bis | 12:00` geschrieben, die Notiz wieder auf Anmerkungen, Ansprechperson und
-  Träger verteilt. Exportiert werden bestätigte Termine; „täglich wiederkehrende“ Termine kommen
+  `ganztägig`, `bis | 12:00` geschrieben, die Ansprechperson als Kürzel, der Träger mit Namen. Exportiert werden bestätigte Termine; „täglich wiederkehrende“ Termine kommen
   als einzelne Tageszeilen zurück.
 - Upload-Grenze 4 MB (`next.config.mjs`), die Jahrespläne liegen bei etwa 150 KB.
 
@@ -281,7 +285,7 @@ im Bericht, damit sie nachprüfbar ist:
 | `bis 15:00` als Startangabe | Fortsetzung vom Vortag |
 | Datumszelle leer (verbundene Zellen) | Datum der Zeile darüber |
 | Aufeinanderfolgende ganztägige Tage mit gleichem Titel | ein durchgehender Termin |
-| `Anmerkungen`, `Ansprechperson`, `Träger` | zusammen in die Notiz des Termins |
+| `Anmerkungen`, `Ansprechperson`, `Träger` | zusammen in die Notiz des Termins (das Skript kennt anders als die App keine Stammdaten) |
 
 **Dubletten** werden übersprungen: identischer Raum, Zeitraum und Titel wird nur einmal
 angelegt. Das ist nötig, weil sich die Jahrespläne am Jahreswechsel überlappen – der

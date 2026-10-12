@@ -29,7 +29,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 import * as schema from '../src/lib/db/schema';
 import { normalizeDatabaseUrl, maskUrl } from '../src/lib/db/url';
 import {
-  DEFAULT_COLOR, dupKey, isSkippedSheet, matchRoom, mergeRuns, readSheet, sheetKey, strip,
+  DEFAULT_COLOR, dupKey, isSkippedSheet, matchRoom, fullNote, mergeRuns, readSheet, sheetKey, strip,
 } from '../src/lib/plan/parse';
 
 const { bookings, rooms, roomGroups, users } = schema;
@@ -233,7 +233,8 @@ async function main() {
         const values = list.map((b) => ({
           roomId: room!.id,
           title: b.title,
-          note: b.note,
+          // Das Skript kennt keine Stammdaten – Ansprechperson und Träger bleiben in der Notiz
+          note: fullNote(b.note, b.contact, b.carrier),
           startDate: b.startDate,
           endDate: b.endDate,
           startTime: b.startTime,

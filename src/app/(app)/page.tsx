@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { getBookings, getContacts, getRooms, rangeFor } from '@/lib/data';
+import { getBookings, getCarriers, getContacts, getRooms, rangeFor } from '@/lib/data';
 import { CalendarClient } from '@/components/CalendarClient';
 import { iso, parseISO } from '@/lib/dates';
 
@@ -16,8 +16,8 @@ export default async function CalendarPage({
 
   const { from, to } = rangeFor(view, parseISO(cursor));
   const admin = session?.user.role === 'ADMIN';
-  const [rooms, events, contacts] = await Promise.all([
-    getRooms(), getBookings(from, to), admin ? getContacts() : [],
+  const [rooms, events, contacts, carriers] = await Promise.all([
+    getRooms(), getBookings(from, to), admin ? getContacts() : [], getCarriers(),
   ]);
 
   return (
@@ -25,6 +25,7 @@ export default async function CalendarPage({
       events={events}
       rooms={rooms}
       contacts={contacts}
+      carriers={carriers}
       admin={admin}
       cursor={cursor}
       view={view}

@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
-import { db, bookings, rooms } from '@/lib/db';
+import { db, bookings, carriers, rooms, users } from '@/lib/db';
+import { shortOf } from '@/lib/calendar';
 import { buildPlanWorkbook } from '@/lib/plan/write';
 import { iso } from '@/lib/dates';
 
@@ -20,16 +21,23 @@ export async function GET(req: Request) {
     db.select({ id: rooms.id, name: rooms.name, color: rooms.color, planSheet: rooms.planSheet })
       .from(rooms).where(eq(rooms.isActive, true)).orderBy(asc(rooms.sortOrder), asc(rooms.name)),
     db.select({
-      roomId: bookings.roomId, title: bookings.title, note: bookings.note,
+      roomId: bookings.roomId, title: bookings.title, note: bookings.note, carrier: carriers.name,
+      contactName: users.name, contactShort: users.short,
       startDate: bookings.startDate, endDate: bookings.endDate,
       startTime: bookings.startTime, endTime: bookings.endTime, spanMode: bookings.spanMode,
-    }).from(bookings).where(and(
-      eq(bookings.status, 'CONFIRMED'),
-      lte(bookings.startDate, `${year}-12-31`), gte(bookings.endDate, `${year}-01-01`),
-    )).orderBy(asc(bookings.startDate), asc(bookings.startTime)),
+    }).from(bookings)
+      .leftJoin(carriers, eq(bookings.carrierId, carriers.id))
+      // Nur eine ausdrücklich gesetzte Ansprechperson – nicht, wer den Import ausgeführt hat
+      .leftJoin(users, eq(bookings.contactId, users.id))
+      .where(and(
+        eq(bookings.status, 'CONFIRMED'),
+        lte(bookings.startDate, `${year}-12-31`), gte(bookings.endDate, `${year}-01-01`),
+      )).orderBy(asc(bookings.startDate), asc(bookings.startTime)),
   ]);
 
-  const wb = buildPlanWorkbook(year, roomList, rows);
+  const wb = buildPlanWorkbook(year, roomList, rows.map(({ contactName, contactShort, ...b }) => ({
+    ...b, contact: contactName ? shortOf(contactName, contactShort) : null,
+  })));
   const buf = await wb.xlsx.writeBuffer();
   const stamp = iso(new Date()).slice(2).replace(/-/g, '');
   const name = `${year}_PaulusHaus BELEGUNGSPLAN_Stand ${stamp}.xlsx`;

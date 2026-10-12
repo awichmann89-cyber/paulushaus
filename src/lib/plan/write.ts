@@ -12,6 +12,9 @@ import { ALLDAY_END, ALLDAY_START, sheetLabel, splitNote } from './parse';
 export interface PlanRoom { id: number; name: string; color: string; planSheet: string | null }
 export interface PlanBooking {
   roomId: number; title: string; note: string | null;
+  /** Kürzel der Ansprechperson und Name des Trägers; ohne sie gilt der Text aus der Notiz */
+  contact?: string | null;
+  carrier?: string | null;
   startDate: string; endDate: string; startTime: string; endTime: string;
   spanMode: 'SINGLE' | 'THROUGH' | 'DAILY';
 }
@@ -42,7 +45,7 @@ export const roomSheetLabel = (r: PlanRoom) => sheetLabel(r.planSheet?.trim() ||
 function linesFor(b: PlanBooking, year: number): [string, Line][] {
   const st = b.startTime.slice(0, 5), en = b.endTime.slice(0, 5);
   const { note, contact, carrier } = splitNote(b.note);
-  const base = { title: b.title, note, contact, carrier };
+  const base = { title: b.title, note, contact: b.contact || contact, carrier: b.carrier || carrier };
   const inYear = (d: string) => d.startsWith(`${year}-`);
 
   const days: string[] = [];

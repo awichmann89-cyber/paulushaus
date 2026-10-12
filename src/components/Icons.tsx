@@ -13,6 +13,9 @@ export const IcoUsers = (p: { s?: number }) => (
   <S {...p}><path d="M17 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" /><circle cx="9.5" cy="7" r="4" /><path d="M22 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13A4 4 0 0119 7a4 4 0 01-3 3.87" /></S>);
 export const IcoUser = (p: { s?: number }) => (
   <S {...p}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></S>);
+/** Träger: ein Gebäude mit Fenstern */
+export const IcoOrg = (p: { s?: number }) => (
+  <S {...p}><path d="M3 21h18M5 21V7l7-4 7 4v14" /><path d="M9 21v-4h6v4M9 10h.01M15 10h.01M9 13.5h.01M15 13.5h.01" /></S>);
 export const IcoDoor = (p: { s?: number }) => (
   <S {...p}><path d="M4 21h16M6 21V4a1 1 0 011-1h10a1 1 0 011 1v17" /><circle cx="14.5" cy="12" r="1" /></S>);
 export const IcoClock = (p: { s?: number }) => (

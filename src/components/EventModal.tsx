@@ -31,12 +31,16 @@ export interface Draft {
   spanMode?: SpanMode;
   seriesId?: number | null;
   contactId?: number | null;
+  carrierId?: number | null;
+  /** Name des bisherigen Trägers, falls er inzwischen archiviert ist */
+  carrier?: string | null;
 }
 
 export interface Contact { id: number; name: string; short: string }
+export interface Carrier { id: number; name: string }
 
-export function EventModal({ draft, rooms, contacts, admin, onClose }: {
-  draft: Draft; rooms: RoomView[]; contacts: Contact[]; admin: boolean; onClose: () => void;
+export function EventModal({ draft, rooms, contacts, carriers, admin, onClose }: {
+  draft: Draft; rooms: RoomView[]; contacts: Contact[]; carriers: Carrier[]; admin: boolean; onClose: () => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -52,6 +56,7 @@ export function EventModal({ draft, rooms, contacts, admin, onClose }: {
     spanMode: (draft.spanMode ?? 'THROUGH') as SpanMode,
     attendees: draft.attendees ?? 10,
     contactId: draft.contactId ?? 0,
+    carrierId: draft.carrierId ?? 0,
   });
   const [rep, setRep] = useState({
     freq: 'NONE' as RecurFreq | 'NONE',
@@ -113,6 +118,7 @@ export function EventModal({ draft, rooms, contacts, admin, onClose }: {
           spanMode: multi ? f.spanMode : 'SINGLE',
           attendees: Number(f.attendees) || 0,
           contactId: f.contactId || null,
+          carrierId: f.carrierId || null,
           recurrence,
           scope: inSeries ? scope : undefined,
         });
@@ -312,6 +318,18 @@ export function EventModal({ draft, rooms, contacts, admin, onClose }: {
           </select>
         </div>
       )}
+
+      <div className="field">
+        <label>Träger</label>
+        <select className="input" value={f.carrierId} onChange={(e) => setF({ ...f, carrierId: Number(e.target.value) })}>
+          <option value={0}>– kein Träger –</option>
+          {/* Ein archivierter Träger bleibt am Termin stehen, bis jemand einen anderen wählt */}
+          {f.carrierId > 0 && !carriers.some((c) => c.id === f.carrierId) && (
+            <option value={f.carrierId}>{draft.carrier ?? 'Bisheriger Träger'}</option>
+          )}
+          {carriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
 
       <div className="field">
         <label>Personen</label>

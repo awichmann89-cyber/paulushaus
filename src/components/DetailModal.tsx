@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Modal } from './Modal';
 import { toast } from './Toast';
-import { IcoClock, IcoDoor, IcoRepeat, IcoUser, IcoUsers } from './Icons';
+import { IcoClock, IcoDoor, IcoOrg, IcoRepeat, IcoUser, IcoUsers } from './Icons';
 import { daysOf, isMulti, rangeText, type Ev, type RoomView } from '@/lib/calendar';
 import { clock, longDate, parseISO } from '@/lib/dates';
 import { cancelBooking, decideBooking } from '@/lib/actions/bookings';
@@ -102,6 +102,12 @@ export function DetailModal({ ev, room, admin, onClose, onEdit }: {
             {ev.createdBy && ev.createdBy !== ev.contact
               ? ` · ${ev.status === 'PENDING' ? 'angefragt' : 'eingetragen'} von ${ev.createdBy}` : ''}</small></div>
       </div>
+
+      {ev.carrier && (
+        <div className="info-line"><IcoOrg />
+          <div><b>{ev.carrier}</b><small>Träger</small></div>
+        </div>
+      )}
 
       {ev.note && <div className="note" style={{ marginTop: 6 }}>„{ev.note}“</div>}
       {err && <div className="err">{err}</div>}
