@@ -1,25 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-
-export interface PrintRow {
-  day: string;
-  dayText: string;
-  time: string;
-  title: string;
-  multi: boolean;
-  daily: boolean;
-  contact: string;
-}
-
-export interface PrintSheet {
-  id: number;
-  name: string;
-  color: string;
-  sub: string;          // „Belegungsplan Mai 2026 · Erdgeschoss · 80 Plätze“
-  count: number;
-  rows: PrintRow[];
-}
+import type { PrintRow, PrintSheet } from '@/lib/print';
 
 /** Höhe eines Bogens – knapp unter den 265 mm, die A4 bei 16 mm Rand bietet
  *  (siehe @page und #printArea .sheet in globals.css) */

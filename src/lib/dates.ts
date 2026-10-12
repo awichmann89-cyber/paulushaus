@@ -64,6 +64,14 @@ export function niceStamp(d: Date | string | null | undefined): string {
   return `${String(x.getDate()).padStart(2, '0')}.${String(x.getMonth() + 1).padStart(2, '0')}.${x.getFullYear()}, ` +
     `${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')} Uhr`;
 }
+/** Wie niceStamp, aber immer deutsche Zeit – für alles, was auf dem Server entsteht
+ *  (der läuft auf Vercel in UTC) */
+export function berlinStamp(d: Date): string {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(d).map((x) => [x.type, x.value]));
+  return `${p.day}.${p.month}.${p.year}, ${p.hour}:${p.minute} Uhr`;
+}
 export function longDate(d: Date): string {
   return `${DWL[dowIdx(d)]}, ${d.getDate()}. ${MON[d.getMonth()]} ${d.getFullYear()}`;
 }

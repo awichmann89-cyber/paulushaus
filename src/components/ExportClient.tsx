@@ -37,14 +37,24 @@ export function ExportClient({ month, rows }: { month: string; rows: Row[] }) {
   const printUrl = (ids: number[], auto = false) =>
     `/print?month=${month}&rooms=${ids.join(',')}${auto ? '&auto=1' : ''}`;
 
-  const doPrint = (ids: number[]) =>
+  /** PDF landet als Download im Downloads-Ordner, Drucken öffnet die Druckansicht */
+  const doExport = (ids: number[], how: 'pdf' | 'print') =>
     start(async () => {
       try {
         await recordExport(ids, month);
         setPreview(null);
         router.refresh();
+        if (how === 'pdf') {
+          const a = document.createElement('a');
+          a.href = `/print/pdf?month=${month}&rooms=${ids.join(',')}`;
+          a.download = '';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } else {
+          window.open(printUrl(ids, true), '_blank', 'noopener');
+        }
         toast(`${plural(ids.length, 'Liste', 'Listen')} exportiert – Stand ${niceStamp(new Date())}`);
-        window.open(printUrl(ids, true), '_blank', 'noopener');
       } catch (e) {
         setErr(e instanceof Error ? e.message : 'Export fehlgeschlagen.');
       }
@@ -121,13 +131,14 @@ export function ExportClient({ month, rows }: { month: string; rows: Row[] }) {
       {preview && (
         <Modal
           title={`Belegungsliste ${monthName}`}
-          subtitle={`${plural(preview.length, 'Raum-Liste', 'Raum-Listen')} · so wird gedruckt bzw. als PDF gespeichert`}
+          subtitle={`${plural(preview.length, 'Raum-Liste', 'Raum-Listen')} · so sieht das PDF bzw. der Ausdruck aus`}
           width={800}
           onClose={() => setPreview(null)}
           footer={<>
             <button className="btn btn-ghost" onClick={() => setPreview(null)}>Abbrechen</button>
-            <button className="btn btn-primary" disabled={busy} onClick={() => doPrint(preview)}>
-              {busy ? 'Wird vorbereitet …' : 'Als PDF speichern / drucken'}
+            <button className="btn btn-ghost" disabled={busy} onClick={() => doExport(preview, 'print')}>Drucken</button>
+            <button className="btn btn-primary" disabled={busy} onClick={() => doExport(preview, 'pdf')}>
+              <IcoDown s={15} /> {busy ? 'Wird vorbereitet …' : 'PDF herunterladen'}
             </button>
           </>}>
           <iframe src={printUrl(preview)} title="Vorschau"
