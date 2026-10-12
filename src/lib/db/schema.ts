@@ -4,7 +4,8 @@ import {
 
 /* Rollen und Status als text + CHECK-freie Konvention – hält Migrationen einfach */
 export const ROLES = ['ADMIN', 'USER'] as const;
-export const USER_STATUS = ['INVITED', 'ACTIVE', 'DISABLED'] as const;
+/** CONTACT = Person ohne Zugang, nur für die Kontaktliste und als Ansprechperson */
+export const USER_STATUS = ['CONTACT', 'INVITED', 'ACTIVE', 'DISABLED'] as const;
 export const SPAN_MODES = ['SINGLE', 'THROUGH', 'DAILY'] as const;
 export const BOOKING_STATUS = ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED'] as const;
 export const RECUR_FREQS = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'] as const;
@@ -21,8 +22,10 @@ export const users = pgTable(
   'users',
   {
     id: serial('id').primaryKey(),
-    email: text('email').notNull(),
+    /** Leer nur bei Kontakten ohne Zugang. NULL verletzt den Unique-Index nicht */
+    email: text('email'),
     name: text('name').notNull(),
+    phone: text('phone'),
     /** Kürzel für die Monatslisten, z. B. „MS“. Leer = Initialen aus dem Namen */
     short: text('short'),
     passwordHash: text('password_hash'),

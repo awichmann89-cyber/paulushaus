@@ -5,43 +5,75 @@ import { revalidatePath } from 'next/cache';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { db, users } from '@/lib/db';
+import type { UserStatus } from '@/lib/db/schema';
 import { requireAdmin } from '@/lib/auth';
 import { appUrl, inviteMail, sendMail } from '@/lib/mail';
 
-export async function inviteUser(input: { name: string; email: string; role: 'ADMIN' | 'USER' }) {
-  await requireAdmin();
-  const email = input.email.trim().toLowerCase();
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** Prüft und normalisiert die Kontaktdaten. E-Mail ist nur für Accounts Pflicht */
+async function cleanContact(input: { name: string; email: string; phone: string }, needEmail: boolean, selfId?: number) {
   const name = input.name.trim();
+  const email = input.email.trim().toLowerCase();
+  const phone = input.phone.trim().replace(/\s+/g, ' ');
   if (!name) throw new Error('Bitte einen Namen angeben.');
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Bitte eine gültige E-Mail-Adresse angeben.');
-
-  const [exists] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  if (exists) throw new Error('Diese E-Mail-Adresse ist bereits vergeben.');
-
-  const token = randomBytes(32).toString('hex');
-  const expires = new Date(Date.now() + 7 * 24 * 3600 * 1000);
-  await db.insert(users).values({
-    email, name, role: input.role, status: 'INVITED',
-    inviteToken: token, inviteExpiresAt: expires,
-  });
-
-  const link = `${appUrl()}/invite/${token}`;
-  const sent = await sendMail(email, 'Dein Zugang zum Raumplaner', inviteMail(name, link));
-  revalidatePath('/', 'layout');
-  return { ok: true as const, sent, link };
+  if (needEmail && !email) throw new Error('Für einen Zugang wird eine E-Mail-Adresse gebraucht.');
+  if (email && !EMAIL_RE.test(email)) throw new Error('Bitte eine gültige E-Mail-Adresse angeben.');
+  if (phone && !/^[0-9+()/\- ]{3,40}$/.test(phone)) throw new Error('Bitte eine gültige Telefonnummer angeben.');
+  if (email) {
+    const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+    if (exists && exists.id !== selfId) throw new Error('Diese E-Mail-Adresse ist bereits vergeben.');
+  }
+  return { name, email: email || null, phone: phone || null };
 }
 
-export async function resendInvite(id: number) {
-  await requireAdmin();
+async function sendInvite(id: number) {
   const token = randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 7 * 24 * 3600 * 1000);
   const [u] = await db.update(users)
     .set({ inviteToken: token, inviteExpiresAt: expires, status: 'INVITED' })
     .where(eq(users.id, id)).returning();
   const link = `${appUrl()}/invite/${token}`;
-  const sent = await sendMail(u.email, 'Dein Zugang zum Raumplaner', inviteMail(u.name, link));
+  const sent = await sendMail(u.email!, 'Dein Zugang zum Raumplaner', inviteMail(u.name, link));
+  return { sent, link };
+}
+
+/** Legt eine Person an – mit Einladung zum Account oder nur als Kontakt ohne Zugang */
+export async function createUser(input: {
+  name: string; email: string; phone: string; role: 'ADMIN' | 'USER'; account: boolean;
+}) {
+  await requireAdmin();
+  const data = await cleanContact(input, input.account);
+  const [u] = await db.insert(users).values({
+    ...data, role: input.account ? input.role : 'USER', status: 'CONTACT',
+  }).returning({ id: users.id });
+
+  const invite = input.account ? await sendInvite(u.id) : null;
   revalidatePath('/', 'layout');
-  return { ok: true as const, sent, link };
+  return { ok: true as const, invite };
+}
+
+/** Name, E-Mail und Telefon ändern */
+export async function updateUser(id: number, input: { name: string; email: string; phone: string }) {
+  await requireAdmin();
+  const [u] = await db.select({ status: users.status, passwordHash: users.passwordHash })
+    .from(users).where(eq(users.id, id)).limit(1);
+  if (!u) throw new Error('Person nicht gefunden.');
+  // Wer sich anmelden kann oder eingeladen ist, braucht die E-Mail als Login
+  const data = await cleanContact(input, u.status !== 'CONTACT' && (u.status !== 'DISABLED' || !!u.passwordHash), id);
+  await db.update(users).set(data).where(eq(users.id, id));
+  revalidatePath('/', 'layout');
+  return { ok: true as const };
+}
+
+/** Einladung (erneut) verschicken – macht aus einem Kontakt einen Account */
+export async function resendInvite(id: number) {
+  await requireAdmin();
+  const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, id)).limit(1);
+  if (!u?.email) throw new Error('Bitte zuerst eine E-Mail-Adresse hinterlegen.');
+  const invite = await sendInvite(id);
+  revalidatePath('/', 'layout');
+  return { ok: true as const, ...invite };
 }
 
 export async function setUserRole(id: number, role: 'ADMIN' | 'USER') {
@@ -64,7 +96,13 @@ export async function setUserShort(id: number, short: string) {
 export async function setUserStatus(id: number, status: 'ACTIVE' | 'DISABLED') {
   const me = await requireAdmin();
   if (me.id === id) throw new Error('Du kannst deinen eigenen Zugang nicht sperren.');
-  await db.update(users).set({ status }).where(eq(users.id, id));
+  let next: UserStatus = status;
+  if (status === 'ACTIVE') {
+    // Ohne Passwort gibt es keinen Zugang – dann wird die Person wieder zum Kontakt
+    const [u] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, id)).limit(1);
+    if (!u?.passwordHash) next = 'CONTACT';
+  }
+  await db.update(users).set({ status: next }).where(eq(users.id, id));
   revalidatePath('/', 'layout');
   return { ok: true as const };
 }

@@ -151,16 +151,17 @@ export async function saveBooking(input: BookingInput) {
 async function notifyAdmins(input: BookingInput, when: string, requester: string, conflicts: Conflict[]) {
   try {
     const [room] = await db.select().from(rooms).where(eq(rooms.id, input.roomId)).limit(1);
-    const admins = await db.select({ email: users.email }).from(users)
+    const rows = await db.select({ email: users.email }).from(users)
       .where(and(eq(users.role, 'ADMIN'), eq(users.status, 'ACTIVE')));
+    const admins = rows.flatMap((a) => (a.email ? [a.email] : []));
     if (!admins.length) return;
 
     const html = requestMail(
       requester, input.title.trim(), room?.name ?? '–', when,
       input.attendees || 0, input.note?.trim() || null, conflicts,
     );
-    await Promise.all(admins.map((a) =>
-      sendMail(a.email, `Neue Terminanfrage: ${input.title.trim()}`, html)));
+    await Promise.all(admins.map((email) =>
+      sendMail(email, `Neue Terminanfrage: ${input.title.trim()}`, html)));
   } catch (err) {
     // Eine fehlgeschlagene Benachrichtigung darf die Anfrage nicht scheitern lassen
     console.error('Admin-Benachrichtigung fehlgeschlagen:', err);
