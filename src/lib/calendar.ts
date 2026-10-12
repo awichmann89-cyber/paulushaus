@@ -1,4 +1,4 @@
-import { HOUR_START, HOUR_END, addDays, iso, min, parseISO, DW, clock } from './dates';
+import { HOUR_START, HOUR_END, addDays, iso, isAllDay, min, parseISO, DW, clock } from './dates';
 
 export type SpanMode = 'SINGLE' | 'THROUGH' | 'DAILY';
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
@@ -92,7 +92,9 @@ export function rangeText(e: Ev): string {
   const a = parseISO(e.startDate), z = parseISO(e.endDate);
   const f = (d: Date) => `${DW[(d.getDay() + 6) % 7]} ${d.getDate()}.${d.getMonth() + 1}.`;
   const s = clock(e.startTime), t = clock(e.endTime);
-  if (!isMulti(e)) return `${f(a)} ${s}–${t}`;
+  const allDay = isAllDay(s, t);
+  if (!isMulti(e)) return `${f(a)} ${allDay ? 'ganztägig' : `${s}–${t}`}`;
+  if (allDay) return `${f(a)} – ${f(z)} · ${e.spanMode === 'DAILY' ? 'täglich ' : ''}ganztägig`;
   return e.spanMode === 'DAILY'
     ? `${f(a)} – ${f(z)} · täglich ${s}–${t}`
     : `${f(a)} ${s} – ${f(z)} ${t}`;

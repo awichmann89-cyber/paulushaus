@@ -5,6 +5,11 @@ export const MON = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli'
 
 export const HOUR_START = 7;
 export const HOUR_END = 23;
+/** „ganztägig“ füllt genau das Zeitraster – so schreibt es auch der Excel-Export */
+export const ALLDAY_START = `${String(HOUR_START).padStart(2, '0')}:00`;
+export const ALLDAY_END = `${String(HOUR_END).padStart(2, '0')}:00`;
+export const isAllDay = (start: string, end: string) =>
+  start.slice(0, 5) === ALLDAY_START && end.slice(0, 5) === ALLDAY_END;
 export const ROW = 52;   // Pixel pro Stunde
 export const SNAP = 15;  // Rasterung beim Ziehen, Minuten
 

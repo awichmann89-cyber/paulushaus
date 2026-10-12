@@ -6,12 +6,11 @@
  * (scripts/import-belegungsplan.ts). Deshalb hier keine „@/“-Importe.
  */
 import ExcelJS from 'exceljs';
+import { ALLDAY_END, ALLDAY_START } from '../dates';
 
 /* ---------------------------------------------------------------- Konventionen */
 
-/** „ganztägig“ füllt genau das Zeitraster der App (siehe src/lib/dates.ts) */
-export const ALLDAY_START = '07:00';
-export const ALLDAY_END = '23:00';
+export { ALLDAY_START, ALLDAY_END };
 /** Zeilen ohne jede Uhrzeit werden zu einem einstündigen Platzhalter */
 export const PLACEHOLDER_START = '09:00';
 export const PLACEHOLDER_END = '10:00';

@@ -7,7 +7,7 @@ import { toast } from './Toast';
 import { IcoInfo } from './Icons';
 import type { RoomView, SpanMode } from '@/lib/calendar';
 import { saveBooking } from '@/lib/actions/bookings';
-import { addDays, dowIdx, iso, parseISO, DW, DWL } from '@/lib/dates';
+import { addDays, dowIdx, iso, isAllDay, parseISO, ALLDAY_END, ALLDAY_START, DW, DWL } from '@/lib/dates';
 import {
   isLastOfMonth, nthOf, occurrences, unitOf, MAX_OCCURRENCES, OPEN_END_YEARS,
   type MonthlyMode, type Recurrence, type RecurFreq,
@@ -68,6 +68,17 @@ export function EventModal({ draft, rooms, contacts, carriers, admin, onClose }:
     count: 10,
   });
   const [scope, setScope] = useState<'one' | 'following'>('one');
+  /** zuletzt eingetragene Uhrzeiten – kommen zurück, wenn „ganztägig“ wieder abgewählt wird */
+  const [times, setTimes] = useState(isAllDay(draft.start, draft.endTime)
+    ? { startTime: '18:00', endTime: '20:00' } : { startTime: draft.start, endTime: draft.endTime });
+  const allDay = isAllDay(f.startTime, f.endTime);
+  const setAllDay = (on: boolean) => {
+    if (on === allDay) return;
+    if (on) {
+      setTimes({ startTime: f.startTime, endTime: f.endTime });
+      setF({ ...f, startTime: ALLDAY_START, endTime: ALLDAY_END });
+    } else setF({ ...f, ...times });
+  };
 
   const inSeries = !!draft.id && !!draft.seriesId;
   const start = parseISO(f.startDate);
@@ -173,7 +184,20 @@ export function EventModal({ draft, rooms, contacts, carriers, admin, onClose }:
         </div>
       </div>
 
-      <div className="grid2">
+      <div className="field">
+        <label>Uhrzeit</label>
+        <div className="seg-mini">
+          <button className={allDay ? '' : 'on'} onClick={() => setAllDay(false)}>Mit Uhrzeit</button>
+          <button className={allDay ? 'on' : ''} onClick={() => setAllDay(true)}>Ganztägig</button>
+        </div>
+        {allDay && (
+          <div className="hint"><IcoInfo s={13} /><span>
+            Belegt {multi && through ? `vom ersten Tag ${ALLDAY_START} bis zum letzten Tag ${ALLDAY_END}` : `${multi ? 'an jedem Tag ' : ''}von ${ALLDAY_START} bis ${ALLDAY_END}`} – das ganze Zeitraster des Kalenders.
+          </span></div>
+        )}
+      </div>
+
+      {!allDay && <div className="grid2">
         <div className="field">
           <label>{multi && through ? 'Beginn am ersten Tag' : multi ? 'Täglich von' : 'Von'}</label>
           <input className="input" type="time" value={f.startTime}
@@ -184,7 +208,7 @@ export function EventModal({ draft, rooms, contacts, carriers, admin, onClose }:
           <input className="input" type="time" value={f.endTime}
             onChange={(e) => setF({ ...f, endTime: e.target.value })} />
         </div>
-      </div>
+      </div>}
 
       {multi && (
         <div className="field">

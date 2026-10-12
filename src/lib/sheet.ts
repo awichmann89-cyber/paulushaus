@@ -1,4 +1,4 @@
-import { clock, DW, dowIdx, min, parseISO } from './dates';
+import { clock, DW, dowIdx, isAllDay, min, parseISO } from './dates';
 import { daysOf, isMulti, type Ev } from './calendar';
 
 export interface SheetRow {
@@ -11,10 +11,11 @@ export interface SheetRow {
 /** Zeilen der Druckliste: „täglich“-Termine je Tag, durchgehende als eine Zeile */
 export function sheetRows(events: Ev[], month: string): SheetRow[] {
   const out: SheetRow[] = [];
+  const span = (e: Ev) => (isAllDay(e.startTime, e.endTime) ? 'ganztägig' : `${clock(e.startTime)} – ${clock(e.endTime)}`);
   for (const e of events) {
     if (isMulti(e) && e.spanMode === 'DAILY') {
       for (const d of daysOf(e)) {
-        if (d.startsWith(month)) out.push({ day: d, ev: e, time: `${clock(e.startTime)} – ${clock(e.endTime)}`, multi: false });
+        if (d.startsWith(month)) out.push({ day: d, ev: e, time: span(e), multi: false });
       }
     } else if (isMulti(e)) {
       const z = parseISO(e.endDate);
@@ -23,7 +24,7 @@ export function sheetRows(events: Ev[], month: string): SheetRow[] {
         time: `${clock(e.startTime)} → ${String(z.getDate()).padStart(2, '0')}.${String(z.getMonth() + 1).padStart(2, '0')}. ${clock(e.endTime)}`,
       });
     } else {
-      out.push({ day: e.startDate, ev: e, time: `${clock(e.startTime)} – ${clock(e.endTime)}`, multi: false });
+      out.push({ day: e.startDate, ev: e, time: span(e), multi: false });
     }
   }
   return out.sort((a, b) => a.day.localeCompare(b.day) || min(clock(a.ev.startTime)) - min(clock(b.ev.startTime)));
